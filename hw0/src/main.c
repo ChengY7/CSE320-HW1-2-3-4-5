@@ -26,7 +26,7 @@ int main(int argc, char const *argv[], char const *envp[]) {
      * say_hi() is a function that returns a character pointer (a.k.a a string)
      * Journey on over to `src/hi.c` for the next comments.
      */
-    char* hello = say_hi();
+    char *hello = say_hi();
 
     /*
      * This is a print statement in C it places the arguments
