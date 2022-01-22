@@ -33,7 +33,7 @@ int main(int argc, char const *argv[], char const *envp[]) {
      * following the format string into a string following the
      * format string's design.
      */
-    printf("%s, %s%c\n", hello, "World", '!');
+    printf("%d\n", hello);
 
     /* End of our program */
     return 0;
