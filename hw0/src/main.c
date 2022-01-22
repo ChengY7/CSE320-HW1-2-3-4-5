@@ -1,4 +1,3 @@
-
 #include "hi.h" /* This is our headerfile, containing the definition for say_hi() */
 /**
  * This is the full definition of a main function in C the beginning of our
