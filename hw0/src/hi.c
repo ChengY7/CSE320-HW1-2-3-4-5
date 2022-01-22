@@ -5,7 +5,7 @@
  * as you can see it simply returns the string "Hi" Or does it??
  */
 
-char * say_hi(){
+char* say_hi(){
     return "Hi";
 }
 /* Back over to main to finish our program */
