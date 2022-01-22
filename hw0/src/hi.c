@@ -6,6 +6,6 @@
  */
 
 char* say_hi(){
-    return "Hi";
+    return "Hello";
 }
 /* Back over to main to finish our program */
