@@ -1,4 +1,3 @@
-
 #include "hi.h" /* This is our headerfile, containing the definition for say_hi() */
 /**
  * This is the full definition of a main function in C the beginning of our
@@ -27,7 +26,7 @@ int main(int argc, char const *argv[], char const *envp[]) {
      * say_hi() is a function that returns a character pointer (a.k.a a string)
      * Journey on over to `src/hi.c` for the next comments.
      */
-    char *hello = say_hi();
+    const char* hello = say_hi();
 
     /*
      * This is a print statement in C it places the arguments
