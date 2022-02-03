@@ -3,6 +3,7 @@
 #include "argo.h"
 #include "global.h"
 #include "debug.h"
+#include "function.h"
 
 /**
  * @brief Validates command line arguments passed to the program.
@@ -21,6 +22,71 @@
  */
 
 int validargs(int argc, char **argv) {
-    // TO BE IMPLEMENTED
-    abort();
+    if (argc==1) {
+        return -1;
+    }
+    argv++;
+    char *h="-h";
+    char *v="-v";
+    char *c="-c";
+    char *p="-p";
+    if (compare_string(h, *argv)) {
+        global_options=HELP_OPTION;
+        return 0;
+    }
+    else if(compare_string(v, *argv)) {
+        if(argc>2) {
+            global_options=0;
+            return -1;
+        }
+        global_options=VALIDATE_OPTION;
+        return 0;
+    }
+    else if(compare_string(c, *argv)) {
+        if(argc>4) {
+            global_options=0;
+            return -1;
+        }
+        if(argc==2) {
+            global_options=CANONICALIZE_OPTION;
+            return 0;
+        }
+        if(argc==3) {
+            argv++;
+            if(compare_string(p, *argv)) {
+                global_options=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION+4;
+                return 0;
+            }
+            else {
+                global_options=0;
+                return -1;
+            }
+        }
+        if(argc==4) {
+            argv++;
+            if(compare_string(p, *argv)) {
+                argv++;
+                if(is_int(*argv)) {
+                    if(str_to_int(*argv)<256 && str_to_int(*argv)>-1) {
+                        global_options=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION+str_to_int(*argv);
+                        return -0;
+                    } 
+                    else {
+                        global_options=0;
+                        return -1;
+                    }
+                }
+                else {
+                    global_options=0;
+                    return -1;
+                }
+            }
+            else {
+                global_options=0;
+                return -1;
+            }
+        }
+    }
+    global_options=0;
+    return -1;
 }
