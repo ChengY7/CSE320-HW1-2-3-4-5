@@ -4,6 +4,11 @@
 #include "argo.h"
 #include "global.h"
 #include "debug.h"
+#include "function.h"
+int argo_read_object(ARGO_VALUE *v, FILE *f);
+int argo_read_char(FILE *f);
+int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f);
+int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value);
 
 /**
  * @brief  Read JSON input from a specified input stream, parse it,
@@ -26,11 +31,136 @@
  * @return  A valid pointer if the operation is completely successful,
  * NULL if there is any error.
  */
+
+ 
 ARGO_VALUE *argo_read_value(FILE *f) {
-    // TO BE IMPLEMENTED.
-    abort();
+    ARGO_CHAR cursor = argo_read_char(f);        //read the first character
+    while(cursor!=EOF) {                //read throught the file
+        if(cursor==ARGO_LBRACE) {  //If json is an object, initalize it 
+            ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+            argo_next_value++;
+            current_argo_value->type=4;   
+            current_argo_value->next=current_argo_value;
+            current_argo_value->prev=current_argo_value;
+            current_argo_value->name.content=NULL;
+            if(argo_read_object(argo_value_storage, f))     //and call argo_read_object
+                continue;                                   //If successful then continue
+            else 
+                return NULL;                                //Else return null
+        }
+        else if (cursor==ARGO_LBRACK) {
+            ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+            argo_next_value++;
+            current_argo_value->type=5;
+            current_argo_value->next=current_argo_value;
+            current_argo_value->prev=current_argo_value;
+            current_argo_value->name.content=NULL;
+        }
+    }                                              
+    /*
+    ARGO_CHAR current;
+    while((current = fgetc(f)) != EOF) {
+        printf("%c", current-0);
+        //printf("%s", ", ");
+    }
+    */
+    return NULL;
+
+}
+int argo_read_object(ARGO_VALUE *v, FILE *f) {
+    ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);  //initalize the sentinel
+    argo_next_value++;
+    v->content.object.member_list=sentinel;  //set argo value -> content -> member_list to sentinel
+    sentinel->next=sentinel;
+    sentinel->prev=sentinel;
+    sentinel->name.content=NULL;
+    sentinel->type=0;
+    ARGO_CHAR cursor = argo_read_char(f);         //read next char and continue reading file
+    while(cursor!=EOF) {
+        if(cursor==ARGO_RBRACE) {  //If cursor at }
+            cursor=argo_read_char(f);
+            if (cursor==EOF)
+                return 1;          //If end of file return true
+            else    
+                return 0;          //Else return false
+        }
+        else if(argo_is_whitespace(cursor)) {
+            cursor=argo_read_char(f);
+            continue;              //If white space then check next char
+        }
+        else if(cursor==ARGO_QUOTE) {    //If cursor is at " then we know a key is about to start so we make a new ARGO_VALUE
+                if(argo_read_string(&(new_value->name),f)) { //read the string
+                    cursor=argo_read_char(f);
+                    while(cursor!=EOF) {
+                        if (argo_is_whitespac(cursor)) {
+                            cursor=argo_read_char(f);
+                            continue;
+                        }
+                        else if (cursor==ARGO_COLON) {
+
+                        }
+                        else
+                            return 0;
+                    }
+                }   
+                else
+                    return 0;
+            }
+            else {
+                ARGO_VALUE *loop_cursor=sentinel->next;
+                while(loop_cursor!=sentinel) {
+                    if(loop_cursor->next==sentinel) {
+                        loop_cursor->next=new_value;
+                        new_value->next=sentinel;
+                        sentinel->prev=new_value;
+                        new_value->prev=loop_cursor;
+                        break;
+                    }
+                }
+                if(argo_read_string(&(new_value->name), f)) {
+                    cursor=argo_read_char(f);
+                    while(cursor!=EOF) {
+                        if (argo_is_whitespac(cursor)) {
+                            cursor=argo_read_char(f);
+                            continue;
+                        }
+                        else if (cursor==ARGO_COLON) {
+
+                        }
+                        else
+                            return 0;
+                    }
+                }
+                else 
+                    return 0;
+            }
+        }
+        else
+            return 0;               //Else return 0;
+    }
+    return 0;
+}
+int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
+    ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+    argo_next_value++;
+    if (sentinel->next==sentinel) {
+    sentinel->next=new_value;
+    sentinel->prev=new_value;      //insert the new value
+    new_value->next=sentinel;
+    new_value->prev=sentinel;
+
+}
+int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value) {
+
 }
 
+ARGO_CHAR argo_read_char(FILE *f) {
+    ARGO_CHAR current = fgetc(f);
+    argo_chars_read++;
+    if(current==ARGO_LF)
+        argo_lines_read++;
+    return current;
+}
 /**
  * @brief  Read JSON input from a specified input stream, attempt to
  * parse it as a JSON string literal, and return a data structure
@@ -49,10 +179,23 @@ ARGO_VALUE *argo_read_value(FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
+ 
+ 
 int argo_read_string(ARGO_STRING *s, FILE *f) {
     // TO BE IMPLEMENTED.
-    abort();
+    ARGO_CHAR cursor=argo_read_char(f);    //read next character
+    while(cursor!=EOF) {                   //continue reading file
+        if(cursor==ARGO_QUOTE)             //If close quote " then return successful
+            return 1;
+        else {
+            argo_append_char(s, cursor);   //else append the character to the string
+            cursor=argo_read_char(f);      //move on to next character
+            continue;
+        }
+    }
+    return 0;                              //return unsuccessful because of EOF
 }
+
 
 /**
  * @brief  Read JSON input from a specified input stream, attempt to
@@ -76,10 +219,13 @@ int argo_read_string(ARGO_STRING *s, FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
+
+ /*
 int argo_read_number(ARGO_NUMBER *n, FILE *f) {
     // TO BE IMPLEMENTED.
     abort();
 }
+*/
 
 /**
  * @brief  Write canonical JSON representing a specified value to
@@ -94,10 +240,13 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
+
+ /*
 int argo_write_value(ARGO_VALUE *v, FILE *f) {
     // TO BE IMPLEMENTED.
     abort();
 }
+*/
 
 /**
  * @brief  Write canonical JSON representing a specified string
@@ -119,10 +268,13 @@ int argo_write_value(ARGO_VALUE *v, FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
+
+ /*
 int argo_write_string(ARGO_STRING *s, FILE *f) {
     // TO BE IMPLEMENTED.
     abort();
 }
+*/
 
 /**
  * @brief  Write canonical JSON representing a specified number
@@ -142,7 +294,10 @@ int argo_write_string(ARGO_STRING *s, FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
+
+ /*
 int argo_write_number(ARGO_NUMBER *n, FILE *f) {
     // TO BE IMPLEMENTED.
     abort();
 }
+*/
