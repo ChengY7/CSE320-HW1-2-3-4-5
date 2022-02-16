@@ -43,20 +43,37 @@ int main(int argc, char **argv)
             printf("%ls\n", name.content);
             printf("%s", "     ->type: ");
             printf("%d\n", objectPointer->type);
-            //printf("%d\n", *namep->content);
-            struct argo_number num = objectPointer->content.number;
-            printf("%s", "     ->Valid_String: ");
-            printf("%d", num.valid_string);
-            printf("%s", "     String value: ");
-            printf("%ls\n", (num.string_value.content));
-            printf("%s", "     ->Valid_Int: ");
-            printf("%d", num.valid_int);
-            printf("%s", "        Int value: ");
-            printf("%ld\n", num.int_value);
-            printf("%s", "     ->Valid_Float: ");
-            printf("%d", num.valid_float);
-            printf("%s", "      Float value: ");
-            printf("%f\n", num.float_value);
+            if(objectPointer->type==2) {
+                struct argo_number num = objectPointer->content.number;
+                printf("%s", "     ->Valid_String: ");
+                printf("%d", num.valid_string);
+                printf("%s", "     String value: ");
+                printf("%ls\n", (num.string_value.content));
+                printf("%s", "     ->Valid_Int: ");
+                printf("%d", num.valid_int);
+                printf("%s", "        Int value: ");
+                printf("%ld\n", num.int_value);
+                printf("%s", "     ->Valid_Float: ");
+                printf("%d", num.valid_float);
+                printf("%s", "      Float value: ");
+                printf("%f\n", num.float_value);
+            }
+            else if(objectPointer->type==3) {
+                struct argo_string str = objectPointer->content.string;
+                printf("%s%ls\n", "     ->String value: ", str.content);
+            }
+            else if(objectPointer->type==1) {
+                int t = objectPointer->content.basic;
+                if (t==0) {
+                    printf("%s\n", "     ->Basic value: null");
+                }
+                else if (t==1) {
+                    printf("%s\n", "     ->Basic value: true");
+                }
+                else if (t==2) {
+                    printf("%s\n", "     ->Basic value: false");
+                }
+            }
             
         }
         

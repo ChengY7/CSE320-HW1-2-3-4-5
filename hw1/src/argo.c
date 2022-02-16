@@ -43,8 +43,14 @@ ARGO_VALUE *argo_read_value(FILE *f) {
         current_argo_value->next=current_argo_value;
         current_argo_value->prev=current_argo_value;
         current_argo_value->name.content=NULL;
-        if(argo_read_object(argo_value_storage, f))    //and call argo_read_object
-            return current_argo_value; 
+        if(argo_read_object(argo_value_storage, f)) {   //and call argo_read_object
+            cursor=argo_read_char(f);
+            printf("%c\n", cursor);
+            if(cursor==EOF)
+                return current_argo_value; 
+            else 
+                return NULL;
+        }
                                         //If successful then continue
         else 
             return NULL;                                //Else return null
@@ -57,20 +63,16 @@ ARGO_VALUE *argo_read_value(FILE *f) {
         current_argo_value->prev=current_argo_value;
         current_argo_value->name.content=NULL;
     }                                          
-    
-    /*
-    ARGO_CHAR current;
-    while((current = fgetc(f)) != EOF) {
-        printf("%c", current-0);
-        //printf("%s", ", ");
-    }
-    */
-    
     return NULL;
 
 }
 
-
+int argo_read_array(ARGO_VALUE *v, FILE *f) {
+    ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);
+    argo_next_value++;
+    v->content.array.member_list=sentinel;S
+    return 0;
+}
 int argo_read_object(ARGO_VALUE *v, FILE *f) {
     ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);  //initalize the sentinel
     argo_next_value++;
@@ -82,11 +84,7 @@ int argo_read_object(ARGO_VALUE *v, FILE *f) {
     ARGO_CHAR cursor = argo_read_char(f);         //read next char and continue reading file
     while(cursor!=EOF) {
         if(cursor==ARGO_RBRACE) {  //If cursor at }
-            cursor=argo_read_char(f);
-            if (cursor==EOF)
-                return 1;          //If end of file return true
-            else    
-                return 0;          //Else return false
+            return 1;          //If end of file return true
         }
         else if(cursor==ARGO_QUOTE) {    //If cursor is at "
             if(argo_read_jsonLine(sentinel, f)) {
@@ -96,11 +94,7 @@ int argo_read_object(ARGO_VALUE *v, FILE *f) {
                     continue;
                 }
                 else if (cursor==ARGO_RBRACE) {
-                    cursor=argo_read_char(f);
-                    if(cursor==EOF)
-                        return 1;
-                    else
-                        return 0;
+                    return 1;
                 }
                 else
                     return 0;
@@ -125,12 +119,75 @@ int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
                 ungetc(cursor, f);
                 new_value->type=2;
                 if(argo_read_number(&(new_value->content.number), f)) {
-                    //printf("%f\n", new_value->content.number.float_value);
                     return 1;
                 }
                 else {
                     return 0;
                 }
+            }
+            else if (cursor==ARGO_LBRACE) {
+                new_value->type=4;
+                if(argo_read_object(new_value, f)) {
+                    return 1;
+                }
+                return 0;
+            }
+            else if(cursor==ARGO_QUOTE) {
+                new_value->type=3;
+                if(argo_read_string(&(new_value->content.string), f)) {
+                    return 1;
+                }
+                else {
+                    return 0;
+                }
+            }
+            else if(cursor==*(ARGO_TRUE_TOKEN)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_TRUE_TOKEN+1)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_TRUE_TOKEN+2)) {
+                        cursor=argo_read_char(f);
+                        if(cursor==*(ARGO_TRUE_TOKEN+3)) {
+                            new_value->type=1;
+                            new_value->content.basic=ARGO_TRUE;
+                            return 1;
+                        }
+                    }
+                }
+                return 0;
+            }
+            else if (cursor==*(ARGO_FALSE_TOKEN)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_FALSE_TOKEN+1)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_FALSE_TOKEN+2)) {
+                        cursor=argo_read_char(f);
+                        if(cursor==*(ARGO_FALSE_TOKEN+3)) {
+                            cursor=argo_read_char(f);
+                            if(cursor==*(ARGO_FALSE_TOKEN+4)) {
+                                new_value->type=1;
+                                new_value->content.basic=ARGO_FALSE;
+                                return 1;
+                            }
+                        }
+                    }
+                }
+                return 0;
+            }
+            else if (cursor==*(ARGO_NULL_TOKEN)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_NULL_TOKEN+1)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_NULL_TOKEN+2)) {
+                        cursor=argo_read_char(f);
+                        if(cursor==*(ARGO_NULL_TOKEN+3)) {
+                            new_value->type=1;
+                            new_value->content.basic=ARGO_NULL;
+                            return 1;
+                        }
+                    }
+                }
+                return 0;
             }
         }
         else
@@ -259,7 +316,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
                 n->int_value=((n->int_value)*10)+(cursor-'0');
             }
             if(n->valid_float) {
-                n->float_value=(float)(((n->float_value)*10)+(cursor-'0'));
+                n->float_value=(double)(((n->float_value)*10)+(cursor-'0'));
             }
             cursor=argo_read_char(f);
             continue;
@@ -317,7 +374,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
             int counter=0;
             while(argo_is_digit(cursor)) {
                 argo_append_char(&(n->string_value), cursor);
-                n->float_value=(float)((n->float_value*10)+(cursor-'0'));
+                n->float_value=(double)((n->float_value*10)+(cursor-'0'));
                 cursor=argo_read_char(f);
                 counter++;
             }
@@ -333,6 +390,10 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
             ungetc(cursor, f);
             return 1;
         }
+        else if (cursor==ARGO_RBRACE) {
+            ungetc(cursor, f);
+            return 1;
+        }
         else if (argo_is_whitespace(cursor) || cursor==ARGO_COMMA) {
             if(neg) {
                     n->float_value=n->float_value*-1;
@@ -341,7 +402,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
             ungetc(cursor, f);
             return 1;
         }
-        else  
+        else
             return 0;
     }
     return 0;
