@@ -39,11 +39,27 @@ int main(int argc, char **argv)
             objectPointer=objectPointer->next; //Points to members starting with the first element
             struct argo_string name = objectPointer->name;
             struct argo_string *namep = &name;
+            printf("-Name: ");
             printf("%ls\n", name.content);
+            printf("%s", "     ->type: ");
+            printf("%d\n", objectPointer->type);
             //printf("%d\n", *namep->content);
             struct argo_number num = objectPointer->content.number;
+            printf("%s", "     ->Valid_String: ");
+            printf("%d", num.valid_string);
+            printf("%s", "     String value: ");
+            printf("%ls\n", (num.string_value.content));
+            printf("%s", "     ->Valid_Int: ");
+            printf("%d", num.valid_int);
+            printf("%s", "        Int value: ");
             printf("%ld\n", num.int_value);
+            printf("%s", "     ->Valid_Float: ");
+            printf("%d", num.valid_float);
+            printf("%s", "      Float value: ");
+            printf("%f\n", num.float_value);
+            
         }
+        
         
      
        

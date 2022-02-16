@@ -6,7 +6,8 @@
 #include "debug.h"
 #include "function.h"
 int argo_read_object(ARGO_VALUE *v, FILE *f);
-int argo_read_char(FILE *f);
+ARGO_CHAR argo_read_char(FILE *f);
+ARGO_CHAR argo_read_char_forString(FILE *f);
 int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f);
 int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value);
 
@@ -32,31 +33,31 @@ int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value);
  * NULL if there is any error.
  */
 
- 
+
 ARGO_VALUE *argo_read_value(FILE *f) {
     ARGO_CHAR cursor = argo_read_char(f);        //read the first character
-    while(cursor!=EOF) {                //read throught the file
-        if(cursor==ARGO_LBRACE) {  //If json is an object, initalize it 
-            ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
-            argo_next_value++;
-            current_argo_value->type=4;   
-            current_argo_value->next=current_argo_value;
-            current_argo_value->prev=current_argo_value;
-            current_argo_value->name.content=NULL;
-            if(argo_read_object(argo_value_storage, f))     //and call argo_read_object
-                continue;                                   //If successful then continue
-            else 
-                return NULL;                                //Else return null
-        }
-        else if (cursor==ARGO_LBRACK) {
-            ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
-            argo_next_value++;
-            current_argo_value->type=5;
-            current_argo_value->next=current_argo_value;
-            current_argo_value->prev=current_argo_value;
-            current_argo_value->name.content=NULL;
-        }
-    }                                              
+    if(cursor==ARGO_LBRACE) {  //If json is an object, initalize it 
+        ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+        argo_next_value++;
+        current_argo_value->type=4;   
+        current_argo_value->next=current_argo_value;
+        current_argo_value->prev=current_argo_value;
+        current_argo_value->name.content=NULL;
+        if(argo_read_object(argo_value_storage, f))    //and call argo_read_object
+            return current_argo_value; 
+                                        //If successful then continue
+        else 
+            return NULL;                                //Else return null
+    }
+    else if (cursor==ARGO_LBRACK) {
+        ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+        argo_next_value++;
+        current_argo_value->type=5;
+        current_argo_value->next=current_argo_value;
+        current_argo_value->prev=current_argo_value;
+        current_argo_value->name.content=NULL;
+    }                                          
+    
     /*
     ARGO_CHAR current;
     while((current = fgetc(f)) != EOF) {
@@ -64,9 +65,12 @@ ARGO_VALUE *argo_read_value(FILE *f) {
         //printf("%s", ", ");
     }
     */
+    
     return NULL;
 
 }
+
+
 int argo_read_object(ARGO_VALUE *v, FILE *f) {
     ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);  //initalize the sentinel
     argo_next_value++;
@@ -84,56 +88,25 @@ int argo_read_object(ARGO_VALUE *v, FILE *f) {
             else    
                 return 0;          //Else return false
         }
-        else if(argo_is_whitespace(cursor)) {
-            cursor=argo_read_char(f);
-            continue;              //If white space then check next char
-        }
-        else if(cursor==ARGO_QUOTE) {    //If cursor is at " then we know a key is about to start so we make a new ARGO_VALUE
-                if(argo_read_string(&(new_value->name),f)) { //read the string
+        else if(cursor==ARGO_QUOTE) {    //If cursor is at "
+            if(argo_read_jsonLine(sentinel, f)) {
+                cursor=argo_read_char(f);
+                if(cursor==ARGO_COMMA) {
                     cursor=argo_read_char(f);
-                    while(cursor!=EOF) {
-                        if (argo_is_whitespac(cursor)) {
-                            cursor=argo_read_char(f);
-                            continue;
-                        }
-                        else if (cursor==ARGO_COLON) {
-
-                        }
-                        else
-                            return 0;
-                    }
-                }   
+                    continue;
+                }
+                else if (cursor==ARGO_RBRACE) {
+                    cursor=argo_read_char(f);
+                    if(cursor==EOF)
+                        return 1;
+                    else
+                        return 0;
+                }
                 else
                     return 0;
             }
-            else {
-                ARGO_VALUE *loop_cursor=sentinel->next;
-                while(loop_cursor!=sentinel) {
-                    if(loop_cursor->next==sentinel) {
-                        loop_cursor->next=new_value;
-                        new_value->next=sentinel;
-                        sentinel->prev=new_value;
-                        new_value->prev=loop_cursor;
-                        break;
-                    }
-                }
-                if(argo_read_string(&(new_value->name), f)) {
-                    cursor=argo_read_char(f);
-                    while(cursor!=EOF) {
-                        if (argo_is_whitespac(cursor)) {
-                            cursor=argo_read_char(f);
-                            continue;
-                        }
-                        else if (cursor==ARGO_COLON) {
-
-                        }
-                        else
-                            return 0;
-                    }
-                }
-                else 
-                    return 0;
-            }
+            else    
+                return 0;
         }
         else
             return 0;               //Else return 0;
@@ -143,23 +116,71 @@ int argo_read_object(ARGO_VALUE *v, FILE *f) {
 int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
     ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
     argo_next_value++;
-    if (sentinel->next==sentinel) {
-    sentinel->next=new_value;
-    sentinel->prev=new_value;      //insert the new value
-    new_value->next=sentinel;
-    new_value->prev=sentinel;
+    add_to_linkedList(sentinel, new_value);
+    if(argo_read_string(&(new_value->name), f)) {
+        ARGO_CHAR cursor=argo_read_char(f);
+        if(cursor==ARGO_COLON) {
+            cursor=argo_read_char(f);
+            if(argo_is_digit(cursor) || cursor==ARGO_MINUS) {
+                ungetc(cursor, f);
+                new_value->type=2;
+                if(argo_read_number(&(new_value->content.number), f)) {
+                    //printf("%f\n", new_value->content.number.float_value);
+                    return 1;
+                }
+                else {
+                    return 0;
+                }
+            }
+        }
+        else
+            return 0;
+    }
+    else
+        return 0;
 
+
+    return 1;
 }
 int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value) {
-
+    if(sentinel->next==sentinel) {
+        sentinel->next=new_value;
+        sentinel->prev=new_value;      
+        new_value->next=sentinel;
+        new_value->prev=sentinel;
+    }
+    else {
+        ARGO_VALUE *loop_cursor = sentinel->next;
+        while(loop_cursor!=sentinel) {
+            if(loop_cursor->next==sentinel) {
+                loop_cursor->next=new_value;
+                new_value->next=sentinel;
+                sentinel->prev=new_value;
+                new_value->prev=loop_cursor;
+                break;
+            }
+            loop_cursor=loop_cursor->next;
+        }
+    }
+    return 1;
 }
 
 ARGO_CHAR argo_read_char(FILE *f) {
-    ARGO_CHAR current = fgetc(f);
+    ARGO_CHAR cursor = fgetc(f);
+    while(argo_is_whitespace(cursor)) {
+        if(cursor==ARGO_LF)
+            argo_lines_read++;
+        argo_chars_read++;
+        cursor=fgetc(f);
+    }
+    return cursor;
+}
+ARGO_CHAR argo_read_char_forString(FILE *f) {
+    ARGO_CHAR cursor = fgetc(f);
     argo_chars_read++;
-    if(current==ARGO_LF)
+    if(cursor==ARGO_LF)
         argo_lines_read++;
-    return current;
+    return cursor;
 }
 /**
  * @brief  Read JSON input from a specified input stream, attempt to
@@ -183,13 +204,13 @@ ARGO_CHAR argo_read_char(FILE *f) {
  
 int argo_read_string(ARGO_STRING *s, FILE *f) {
     // TO BE IMPLEMENTED.
-    ARGO_CHAR cursor=argo_read_char(f);    //read next character
+    ARGO_CHAR cursor=argo_read_char_forString(f);    //read next character
     while(cursor!=EOF) {                   //continue reading file
         if(cursor==ARGO_QUOTE)             //If close quote " then return successful
             return 1;
         else {
             argo_append_char(s, cursor);   //else append the character to the string
-            cursor=argo_read_char(f);      //move on to next character
+            cursor=argo_read_char_forString(f);      //move on to next character
             continue;
         }
     }
@@ -220,12 +241,112 @@ int argo_read_string(ARGO_STRING *s, FILE *f) {
  * nonzero if there is any error.
  */
 
- /*
+
 int argo_read_number(ARGO_NUMBER *n, FILE *f) {
-    // TO BE IMPLEMENTED.
-    abort();
+    char cursor = argo_read_char(f);
+    int neg = 0;
+    if(cursor==ARGO_MINUS) {
+        neg = 1;
+        cursor=argo_read_char(f);
+    }
+    n->valid_string=1;
+    n->valid_int=1;
+    n->valid_float=1;
+    while (cursor!=EOF) {
+        if(argo_is_digit(cursor)) {
+            argo_append_char(&(n->string_value), cursor);
+            if(n->valid_int) {
+                n->int_value=((n->int_value)*10)+(cursor-'0');
+            }
+            if(n->valid_float) {
+                n->float_value=(float)(((n->float_value)*10)+(cursor-'0'));
+            }
+            cursor=argo_read_char(f);
+            continue;
+        }
+        else if (argo_is_exponent(cursor)) {
+            n->valid_int=0;
+            n->int_value=0;
+            argo_append_char(&(n->string_value), cursor);
+            cursor=argo_read_char(f);
+            int exponent=0;
+            if(cursor==ARGO_MINUS) {
+                argo_append_char(&(n->string_value), cursor);
+                cursor=argo_read_char(f);
+                while(argo_is_digit(cursor)) {
+                    argo_append_char(&(n->string_value), cursor);
+                    exponent=(exponent*10)+(cursor-'0');
+                    cursor=argo_read_char(f);
+                }
+                if(cursor==ARGO_LF)
+                    argo_lines_read--;
+                argo_chars_read--;
+                ungetc(cursor, f);
+                for(int i=0; i<exponent; i++) {
+                    n->float_value=n->float_value*0.1;
+                }
+                if(neg) {
+                    n->float_value=n->float_value*-1;
+                    n->int_value=n->int_value*-1;
+                }
+            }
+            else {
+                while(argo_is_digit(cursor)) {
+                    argo_append_char(&(n->string_value), cursor);
+                    exponent=(exponent*10)+(cursor-'0');
+                    cursor=argo_read_char(f);
+                }
+                if(cursor==ARGO_LF)
+                    argo_lines_read--;
+                ungetc(cursor, f);
+                for(int i=0; i<exponent; i++) {
+                    n->float_value=n->float_value*10;
+                }
+                if(neg) {
+                    n->float_value=n->float_value*-1;
+                    n->int_value=n->int_value*-1;
+                }
+            }
+            return 1;
+        }
+        else if (cursor==ARGO_PERIOD) {
+            n->valid_int=0;
+            n->int_value=0;
+            argo_append_char(&(n->string_value), cursor);
+            cursor = argo_read_char(f);
+            int counter=0;
+            while(argo_is_digit(cursor)) {
+                argo_append_char(&(n->string_value), cursor);
+                n->float_value=(float)((n->float_value*10)+(cursor-'0'));
+                cursor=argo_read_char(f);
+                counter++;
+            }
+            for (int i=0; i<counter; i++) {
+                n->float_value=n->float_value*0.1;
+            }
+            if(argo_is_exponent(cursor)) 
+                continue;
+            if(neg) {
+                    n->float_value=n->float_value*-1;
+                    n->int_value=n->int_value*-1;
+            }
+            ungetc(cursor, f);
+            return 1;
+        }
+        else if (argo_is_whitespace(cursor) || cursor==ARGO_COMMA) {
+            if(neg) {
+                    n->float_value=n->float_value*-1;
+                    n->int_value=n->int_value*-1;
+            }
+            ungetc(cursor, f);
+            return 1;
+        }
+        else  
+            return 0;
+    }
+    return 0;
 }
-*/
+
 
 /**
  * @brief  Write canonical JSON representing a specified value to
