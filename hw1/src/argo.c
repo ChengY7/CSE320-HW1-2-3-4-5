@@ -10,6 +10,8 @@ ARGO_CHAR argo_read_char(FILE *f);
 ARGO_CHAR argo_read_char_forString(FILE *f);
 int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f);
 int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value);
+int argo_read_array(ARGO_VALUE *v, FILE *f);
+int argo_convert_hex_dec(FILE *f);
 
 /**
  * @brief  Read JSON input from a specified input stream, parse it,
@@ -45,13 +47,11 @@ ARGO_VALUE *argo_read_value(FILE *f) {
         current_argo_value->name.content=NULL;
         if(argo_read_object(argo_value_storage, f)) {   //and call argo_read_object
             cursor=argo_read_char(f);
-            printf("%c\n", cursor);
             if(cursor==EOF)
                 return current_argo_value; 
             else 
                 return NULL;
-        }
-                                        //If successful then continue
+        }                       //If successful then continue
         else 
             return NULL;                                //Else return null
     }
@@ -62,17 +62,203 @@ ARGO_VALUE *argo_read_value(FILE *f) {
         current_argo_value->next=current_argo_value;
         current_argo_value->prev=current_argo_value;
         current_argo_value->name.content=NULL;
+        if(argo_read_array(argo_value_storage, f)) {
+            cursor=argo_read_char(f);
+            if(cursor==EOF) {
+                return current_argo_value;
+            }
+            else    
+                return NULL;
+        }
+        else
+            return NULL;
     }                                          
     return NULL;
 
 }
 
+
+
 int argo_read_array(ARGO_VALUE *v, FILE *f) {
     ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);
     argo_next_value++;
-    v->content.array.member_list=sentinel;S
+    v->content.array.element_list=sentinel;
+    sentinel->next=sentinel;
+    sentinel->prev=sentinel;
+    sentinel->name.content=NULL;
+    sentinel->type=0;
+    ARGO_CHAR cursor = argo_read_char(f);
+    while(cursor!=EOF) {
+        if(cursor==ARGO_RBRACK) {
+            return 1;
+        }
+        else if(cursor==ARGO_QUOTE) {
+            ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+            argo_next_value++;
+            add_to_linkedList(sentinel, new_value);
+            if(argo_read_string(&(new_value->content.string), f)) {
+                new_value->type=3;
+                cursor=argo_read_char(f);
+                if(cursor==ARGO_COMMA) {
+                    cursor=argo_read_char(f);
+                    continue;
+                }
+                else if (cursor==ARGO_RBRACK) {
+                    return 1;
+                }
+                else 
+                    return 0;
+            }
+            return 0;
+        }
+        else if(argo_is_digit(cursor) || cursor==ARGO_MINUS) {
+            ungetc(cursor, f);
+            ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+            argo_next_value++;
+            add_to_linkedList(sentinel, new_value);
+            if(argo_read_number(&(new_value->content.number), f)) {
+                new_value->type=2;
+                cursor=argo_read_char(f);
+                if(cursor==ARGO_COMMA) {
+                    cursor=argo_read_char(f);
+                    continue;
+                }
+                else if (cursor==ARGO_RBRACK) {
+                    return 1;
+                }
+                else    
+                    return 0;
+            }
+            return 0;
+        }
+        else if(cursor==*(ARGO_TRUE_TOKEN)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_TRUE_TOKEN+1)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_TRUE_TOKEN+2)) {
+                        cursor=argo_read_char(f);
+                        if(cursor==*(ARGO_TRUE_TOKEN+3)) {
+                            ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+                            argo_next_value++;
+                            add_to_linkedList(sentinel, new_value);
+                            new_value->type=1;
+                            new_value->content.basic=ARGO_TRUE;
+                            cursor=argo_read_char(f);
+                            if(cursor==ARGO_COMMA) {
+                                cursor=argo_read_char(f);
+                                continue;
+                            }
+                            else if (cursor==ARGO_RBRACK) {
+                                return 1;
+                            }
+                            else    
+                                return 0;
+                        }
+                    }
+                }
+                return 0;
+        }
+        else if (cursor==*(ARGO_FALSE_TOKEN)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_FALSE_TOKEN+1)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_FALSE_TOKEN+2)) {
+                        cursor=argo_read_char(f);
+                        if(cursor==*(ARGO_FALSE_TOKEN+3)) {
+                            cursor=argo_read_char(f);
+                            if(cursor==*(ARGO_FALSE_TOKEN+4)) {
+                                ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+                                argo_next_value++;
+                                add_to_linkedList(sentinel, new_value);
+                                new_value->type=1;
+                                new_value->content.basic=ARGO_FALSE;
+                                cursor=argo_read_char(f);
+                                if(cursor==ARGO_COMMA) {
+                                    cursor=argo_read_char(f);
+                                    continue;
+                                }
+                                else if (cursor==ARGO_RBRACK) {
+                                    return 1;
+                                }
+                                else    
+                                    return 0;
+                            }
+                        }
+                    }
+                }
+                return 0;
+        }
+        else if (cursor==*(ARGO_NULL_TOKEN)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_NULL_TOKEN+1)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_NULL_TOKEN+2)) {
+                        cursor=argo_read_char(f);
+                        if(cursor==*(ARGO_NULL_TOKEN+3)) {
+                            ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+                            argo_next_value++;
+                            add_to_linkedList(sentinel, new_value);
+                            new_value->type=1;
+                            new_value->content.basic=ARGO_NULL;
+                            cursor=argo_read_char(f);
+                            if(cursor==ARGO_COMMA) {
+                                cursor=argo_read_char(f);
+                                continue;
+                            }
+                            else if (cursor==ARGO_RBRACK) {
+                                return 1;
+                            }
+                            else    
+                                return 0;
+                        }
+                    }
+                }
+                return 0;
+        }
+        else if(cursor==ARGO_LBRACK) {
+            ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+            argo_next_value++;
+            add_to_linkedList(sentinel, new_value);
+            new_value->type=5;
+            if(argo_read_array(new_value, f)) {
+                cursor=argo_read_char(f);
+                if(cursor==ARGO_COMMA) {
+                    cursor=argo_read_char(f);
+                    continue;
+                }
+                else if (cursor==ARGO_RBRACK) {
+                    return 1;
+                }
+                else    
+                    return 0;
+            }
+            return 0;
+        }
+        else if(cursor==ARGO_LBRACE) {
+            ARGO_VALUE *new_value=(argo_value_storage+argo_next_value);
+            argo_next_value++;
+            add_to_linkedList(sentinel, new_value);
+            new_value->type=4;
+            if(argo_read_object(new_value, f)) {
+                cursor=argo_read_char(f);
+                if(cursor==ARGO_COMMA) {
+                    cursor=argo_read_char(f);
+                    continue;
+                }
+                else if (cursor==ARGO_RBRACK) {
+                    return 1;
+                }
+                else    
+                    return 0;
+            }
+            return 0;
+        }
+        else
+            return 0;
+    }
     return 0;
 }
+
 int argo_read_object(ARGO_VALUE *v, FILE *f) {
     ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);  //initalize the sentinel
     argo_next_value++;
@@ -128,6 +314,13 @@ int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
             else if (cursor==ARGO_LBRACE) {
                 new_value->type=4;
                 if(argo_read_object(new_value, f)) {
+                    return 1;
+                }
+                return 0;
+            }
+            else if (cursor==ARGO_LBRACK) {
+                new_value->type=5;
+                if(argo_read_array(new_value, f)) {
                     return 1;
                 }
                 return 0;
@@ -265,6 +458,65 @@ int argo_read_string(ARGO_STRING *s, FILE *f) {
     while(cursor!=EOF) {                   //continue reading file
         if(cursor==ARGO_QUOTE)             //If close quote " then return successful
             return 1;
+        else if(argo_is_control(cursor)) {
+            cursor=argo_read_char_forString(f);
+            continue;
+        }
+        else if(cursor==ARGO_BSLASH) {
+            cursor=argo_read_char_forString(f);
+            if(cursor==ARGO_QUOTE) {
+                argo_append_char(s, ARGO_QUOTE);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_BSLASH) {
+                argo_append_char(s, ARGO_BSLASH);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_FSLASH) {
+                argo_append_char(s, ARGO_FSLASH);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_B) {
+                argo_append_char(s, ARGO_BS);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_F) {
+                argo_append_char(s, ARGO_FF);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_N) {
+                argo_append_char(s, ARGO_LF);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_R) {
+                argo_append_char(s, ARGO_CR);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_T) {
+                argo_append_char(s, ARGO_HT);
+                cursor=argo_read_char_forString(f);
+                continue;
+            }
+            else if(cursor==ARGO_U) {
+                int x = argo_convert_hex_dec(f);
+                if(x!=-1) {
+                    argo_append_char(s, x);
+                    cursor=argo_read_char_forString(f);
+                    continue;
+                }
+                else 
+                    return 0;
+            }
+            else 
+                return 0;
+        }
         else {
             argo_append_char(s, cursor);   //else append the character to the string
             cursor=argo_read_char_forString(f);      //move on to next character
@@ -273,6 +525,42 @@ int argo_read_string(ARGO_STRING *s, FILE *f) {
     }
     return 0;                              //return unsuccessful because of EOF
 }
+int argo_convert_hex_dec(FILE *f) {
+    ARGO_CHAR cursor='0';
+    int int_value=0;
+    for(int i=0; i<4; i++) {
+        cursor = argo_read_char_forString(f);
+        if(argo_is_hex(cursor)){
+            int current_hex=0;
+            int sixteen_value=0;
+            if(cursor>='0' && cursor<='9') 
+                current_hex=cursor-'0';
+            else if(cursor>='A' && cursor<='Z')
+                current_hex=cursor-55;
+            else {
+                current_hex=cursor-87;
+            }
+            if(i==0) {
+                sixteen_value=4096;
+            }
+            else if(i==1) {
+                sixteen_value=256;
+            }
+            else if(i==2) {
+                sixteen_value=16;
+            }
+            else if(i==3) {
+                sixteen_value=1;
+            }
+            int_value=int_value+(current_hex*sixteen_value);
+        }
+        else {
+            return -1;
+        }
+    }
+    return int_value;
+}
+
 
 
 /**
@@ -390,7 +678,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
             ungetc(cursor, f);
             return 1;
         }
-        else if (cursor==ARGO_RBRACE) {
+        else if (cursor==ARGO_RBRACE || cursor==ARGO_RBRACK) {
             ungetc(cursor, f);
             return 1;
         }

@@ -25,10 +25,54 @@ int main(int argc, char **argv)
         USAGE(*argv, EXIT_SUCCESS);
     // TO BE IMPLEMENTED
     if(global_options == VALIDATE_OPTION) {
-        argo_read_value(stdin);
+        struct argo_value *test = argo_read_value(stdin);
+        
+        argo_write_value(test, stdout);
     }
     if(global_options == CANONICALIZE_OPTION) {
         struct argo_value *test = argo_read_value(stdin);
+        if(test->type==5) {
+            struct argo_array obj = (*test).content.array;
+            struct argo_array *objp = &obj;
+            struct argo_value *objectPointer = objp->element_list;
+            while(objectPointer->next != objp->element_list) {
+                objectPointer=objectPointer->next;
+                if(objectPointer->type==2) {
+                    printf("%s\n", "-Number: ");
+                    struct argo_number num = objectPointer->content.number;
+                    printf("%s", "     ->Valid_String: ");
+                    printf("%d", num.valid_string);
+                    printf("%s", "     String value: ");
+                    printf("%ls\n", (num.string_value.content));
+                    printf("%s", "     ->Valid_Int: ");
+                    printf("%d", num.valid_int);
+                    printf("%s", "        Int value: ");
+                    printf("%ld\n", num.int_value);
+                    printf("%s", "     ->Valid_Float: ");
+                    printf("%d", num.valid_float);
+                    printf("%s", "      Float value: ");
+                    printf("%f\n", num.float_value);
+                }
+                else if(objectPointer->type==3) {
+                    struct argo_string str = objectPointer->content.string;
+                    printf("%s%ls\n", "->String value: ", str.content);
+                }
+                else if(objectPointer->type==1) {
+                    int t = objectPointer->content.basic;
+                    if (t==0) {
+                    printf("%s\n", "->Basic value: null");
+                    }
+                    else if (t==1) {
+                        printf("%s\n", "->Basic value: true");
+                    }   
+                    else if (t==2) {
+                    printf("%s\n", "->Basic value: false");
+                    }
+                }
+                
+            }
+        }
+        else if(test->type==4) {
         // printf("%p\n", test);
         // printf("%d\n", test->type);
         struct argo_object obj = (*test).content.object;
@@ -75,6 +119,7 @@ int main(int argc, char **argv)
                 }
             }
             
+        }
         }
         
         
