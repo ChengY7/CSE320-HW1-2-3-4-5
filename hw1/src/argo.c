@@ -35,7 +35,6 @@ int argo_convert_hex_dec(FILE *f);
  * NULL if there is any error.
  */
 
-
 ARGO_VALUE *argo_read_value(FILE *f) {
     ARGO_CHAR cursor = argo_read_char(f);        //read the first character
     if(cursor==ARGO_LBRACE) {  //If json is an object, initalize it 
@@ -129,12 +128,15 @@ ARGO_VALUE *argo_read_value(FILE *f) {
                     if(cursor==EOF) {
                         return current_argo_value;
                     }
-                    else    
+                    else {   
+                        fprintf(stderr, "[Line: %d] Nothing should be after true\n", argo_lines_read+1); 
                         return NULL;
+                    }
                 }
             }
         }
-        return 0;
+        fprintf(stderr, "[Line: %d] Expecting true\n", argo_lines_read+1);
+        return NULL;
     }
     else if (cursor==*(ARGO_FALSE_TOKEN)) {
         cursor=argo_read_char(f);
@@ -156,13 +158,16 @@ ARGO_VALUE *argo_read_value(FILE *f) {
                         if(cursor==EOF) {
                             return current_argo_value;
                         }
-                        else    
+                        else {   
+                            fprintf(stderr, "[Line: %d] Nothing should be after false\n", argo_lines_read+1); 
                             return NULL;
+                        }
                     }
                 }
             }
         }
-        return 0;
+        fprintf(stderr, "[Line: %d] Expecting false\n", argo_lines_read+1);
+        return NULL;
     }
     else if (cursor==*(ARGO_NULL_TOKEN)) {
         cursor=argo_read_char(f);
@@ -182,18 +187,20 @@ ARGO_VALUE *argo_read_value(FILE *f) {
                     if(cursor==EOF) {
                         return current_argo_value;
                     }
-                    else    
+                    else{    
+                        fprintf(stderr, "[Line: %d] Nothing should be after null\n", argo_lines_read+1);
                         return NULL;
+                    }
                 }
             }
         }
-        return 0;
-    }                                        
+        fprintf(stderr, "[Line: %d] Expecting null\n", argo_lines_read+1);
+        return NULL;
+    }
+    fprintf(stderr, "[Line: %d] Illegal start to json file\n", argo_lines_read+1);                                        
     return NULL;
 
 }
-
-
 
 int argo_read_array(ARGO_VALUE *v, FILE *f) {
     ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);
@@ -222,8 +229,10 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                 else if (cursor==ARGO_RBRACK) {
                     return 1;
                 }
-                else 
+                else{
+                    fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);
                     return 0;
+                }
             }
             return 0;
         }
@@ -242,8 +251,10 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                 else if (cursor==ARGO_RBRACK) {
                     return 1;
                 }
-                else    
+                else {  
+                    fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);  
                     return 0;
+                }
             }
             return 0;
         }
@@ -267,11 +278,14 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                             else if (cursor==ARGO_RBRACK) {
                                 return 1;
                             }
-                            else    
+                            else {
+                                fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);    
                                 return 0;
+                            }
                         }
                     }
                 }
+                fprintf(stderr, "[Line: %d] Expecting true\n", argo_lines_read+1);
                 return 0;
         }
         else if (cursor==*(ARGO_FALSE_TOKEN)) {
@@ -296,12 +310,15 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                                 else if (cursor==ARGO_RBRACK) {
                                     return 1;
                                 }
-                                else    
+                                else {    
+                                    fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);
                                     return 0;
+                                }
                             }
                         }
                     }
                 }
+                fprintf(stderr, "[Line: %d] Expecting false\n", argo_lines_read+1);
                 return 0;
         }
         else if (cursor==*(ARGO_NULL_TOKEN)) {
@@ -324,11 +341,14 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                             else if (cursor==ARGO_RBRACK) {
                                 return 1;
                             }
-                            else    
+                            else {  
+                                fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);  
                                 return 0;
+                            }
                         }
                     }
                 }
+                fprintf(stderr, "[Line: %d] Expecting null\n", argo_lines_read+1);
                 return 0;
         }
         else if(cursor==ARGO_LBRACK) {
@@ -345,8 +365,10 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                 else if (cursor==ARGO_RBRACK) {
                     return 1;
                 }
-                else    
+                else {   
+                    fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);   
                     return 0;
+                }
             }
             return 0;
         }
@@ -364,14 +386,19 @@ int argo_read_array(ARGO_VALUE *v, FILE *f) {
                 else if (cursor==ARGO_RBRACK) {
                     return 1;
                 }
-                else    
+                else  {   
+                    fprintf(stderr, "[Line: %d] Expecting closing array bracket or [Line: any] Expecting comma\n", argo_lines_read+1);  
                     return 0;
+                }
             }
             return 0;
         }
-        else
+        else {
+            fprintf(stderr, "[Line: %d] Illegal start to an array\n", argo_lines_read+1);  
             return 0;
+        }
     }
+    fprintf(stderr, "[Line: %d] Illegal ending to json file\n", argo_lines_read+1);
     return 0;
 }
 
@@ -398,15 +425,20 @@ int argo_read_object(ARGO_VALUE *v, FILE *f) {
                 else if (cursor==ARGO_RBRACE) {
                     return 1;
                 }
-                else
+                else {
+                    fprintf(stderr, "[Line: %d] Expecting closing object brace or [Line: any] Expecting comma\n", argo_lines_read+1);
                     return 0;
+                }
             }
             else    
                 return 0;
         }
-        else
+        else {
+            fprintf(stderr, "[Line: %d] Illegal start to object\n", argo_lines_read+1);
             return 0;               //Else return 0;
+        }
     }
+    fprintf(stderr, "[Line: %d] Illegal ending to json file\n", argo_lines_read+1);
     return 0;
 }
 int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
@@ -463,6 +495,7 @@ int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
                         }
                     }
                 }
+                fprintf(stderr, "[Line: %d] Expecting true\n", argo_lines_read+1);
                 return 0;
             }
             else if (cursor==*(ARGO_FALSE_TOKEN)) {
@@ -481,6 +514,7 @@ int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
                         }
                     }
                 }
+                fprintf(stderr, "[Line: %d] Expecting false\n", argo_lines_read+1);
                 return 0;
             }
             else if (cursor==*(ARGO_NULL_TOKEN)) {
@@ -496,16 +530,21 @@ int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f) {
                         }
                     }
                 }
+                fprintf(stderr, "[Line: %d] Expecting null\n", argo_lines_read+1);
+                return 0;
+            }
+            else {
+                fprintf(stderr, "[Line: %d] Illegal start after colon\n", argo_lines_read+1);
                 return 0;
             }
         }
-        else
+        else {
+            fprintf(stderr, "[Line: %d] Expecting colon\n", argo_lines_read+1);
             return 0;
+        }
     }
     else
         return 0;
-
-
     return 1;
 }
 int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value) {
@@ -630,8 +669,10 @@ int argo_read_string(ARGO_STRING *s, FILE *f) {
                 else 
                     return 0;
             }
-            else 
+            else {
+                fprintf(stderr, "[Line: %d] Illegal character after back slash\n", argo_lines_read+1);
                 return 0;
+            }
         }
         else {
             argo_append_char(s, cursor);   //else append the character to the string
@@ -639,6 +680,7 @@ int argo_read_string(ARGO_STRING *s, FILE *f) {
             continue;
         }
     }
+    fprintf(stderr, "[Line: %d] Illegal ending to json file\n", argo_lines_read+1);
     return 0;                              //return unsuccessful because of EOF
 }
 int argo_convert_hex_dec(FILE *f) {
@@ -671,14 +713,12 @@ int argo_convert_hex_dec(FILE *f) {
             int_value=int_value+(current_hex*sixteen_value);
         }
         else {
+            fprintf(stderr, "[Line: %d] Expecting hex\n", argo_lines_read+1);
             return -1;
         }
     }
     return int_value;
 }
-
-
-
 /**
  * @brief  Read JSON input from a specified input stream, attempt to
  * parse it as a JSON number, and return a data structure representing
@@ -806,8 +846,10 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
             ungetc(cursor, f);
             return 1;
         }
-        else
+        else {
+            fprintf(stderr, "[Line: %d] Illegal number\n", argo_lines_read+1);
             return 0;
+        }
     }
     return 1;
 }
