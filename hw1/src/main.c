@@ -26,7 +26,6 @@ int main(int argc, char **argv)
     // TO BE IMPLEMENTED
     if(global_options == VALIDATE_OPTION) {
         struct argo_value *test = argo_read_value(stdin);
-        
         argo_write_value(test, stdout);
     }
     if(global_options == CANONICALIZE_OPTION) {

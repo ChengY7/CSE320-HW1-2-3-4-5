@@ -72,7 +72,123 @@ ARGO_VALUE *argo_read_value(FILE *f) {
         }
         else
             return NULL;
-    }                                          
+    }
+    else if(argo_is_digit(cursor) || cursor==ARGO_MINUS) {
+        ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+        argo_next_value++;
+        current_argo_value->type=2;
+        current_argo_value->next=current_argo_value;
+        current_argo_value->prev=current_argo_value;
+        current_argo_value->name.content=NULL;
+        ungetc(cursor, f);
+        if(argo_read_number(&(current_argo_value->content.number), f)) {
+            cursor=argo_read_char(f);
+            if(cursor==EOF) {
+                return current_argo_value;
+            }
+            else    
+                return NULL;
+        }
+        else    
+            return NULL;
+    }  
+    else if(cursor==ARGO_QUOTE) {
+        ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+        argo_next_value++;
+        current_argo_value->type=2;
+        current_argo_value->next=current_argo_value;
+        current_argo_value->prev=current_argo_value;
+        current_argo_value->name.content=NULL;
+        if(argo_read_string(&(current_argo_value->content.string),f)) {
+            cursor=argo_read_char(f);
+            if(cursor==EOF) {
+                return current_argo_value;
+            }
+            else    
+                return NULL;
+        }
+        else    
+       
+        return NULL;
+    }
+    else if(cursor==*(ARGO_TRUE_TOKEN)) {
+        cursor=argo_read_char(f);
+        if(cursor==*(ARGO_TRUE_TOKEN+1)) {
+            cursor=argo_read_char(f);
+            if(cursor==*(ARGO_TRUE_TOKEN+2)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_TRUE_TOKEN+3)) {
+                    ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+                    argo_next_value++;
+                    current_argo_value->type=1;
+                    current_argo_value->next=current_argo_value;
+                    current_argo_value->prev=current_argo_value;
+                    current_argo_value->name.content=NULL;
+                    current_argo_value->content.basic=ARGO_TRUE;
+                    cursor=argo_read_char(f);
+                    if(cursor==EOF) {
+                        return current_argo_value;
+                    }
+                    else    
+                        return NULL;
+                }
+            }
+        }
+        return 0;
+    }
+    else if (cursor==*(ARGO_FALSE_TOKEN)) {
+        cursor=argo_read_char(f);
+        if(cursor==*(ARGO_FALSE_TOKEN+1)) {
+            cursor=argo_read_char(f);
+            if(cursor==*(ARGO_FALSE_TOKEN+2)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_FALSE_TOKEN+3)) {
+                    cursor=argo_read_char(f);
+                    if(cursor==*(ARGO_FALSE_TOKEN+4)) {
+                        ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+                        argo_next_value++;
+                        current_argo_value->type=1;
+                        current_argo_value->next=current_argo_value;
+                        current_argo_value->prev=current_argo_value;
+                        current_argo_value->name.content=NULL;
+                        current_argo_value->content.basic=ARGO_FALSE;
+                        cursor=argo_read_char(f);
+                        if(cursor==EOF) {
+                            return current_argo_value;
+                        }
+                        else    
+                            return NULL;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+    else if (cursor==*(ARGO_NULL_TOKEN)) {
+        cursor=argo_read_char(f);
+        if(cursor==*(ARGO_NULL_TOKEN+1)) {
+            cursor=argo_read_char(f);
+            if(cursor==*(ARGO_NULL_TOKEN+2)) {
+                cursor=argo_read_char(f);
+                if(cursor==*(ARGO_NULL_TOKEN+3)) {
+                    ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
+                    argo_next_value++;
+                    current_argo_value->type=1;
+                    current_argo_value->next=current_argo_value;
+                    current_argo_value->prev=current_argo_value;
+                    current_argo_value->name.content=NULL;
+                    current_argo_value->content.basic=ARGO_NULL;
+                    cursor=argo_read_char(f);
+                    if(cursor==EOF) {
+                        return current_argo_value;
+                    }
+                    else    
+                        return NULL;
+                }
+            }
+        }
+        return 0;
+    }                                        
     return NULL;
 
 }
@@ -693,7 +809,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
         else
             return 0;
     }
-    return 0;
+    return 1;
 }
 
 
