@@ -35,6 +35,7 @@ int argo_convert_hex_dec(FILE *f);
  * NULL if there is any error.
  */
 
+/*
 ARGO_VALUE *argo_read_value(FILE *f) {
     ARGO_CHAR cursor = argo_read_char(f);        //read the first character
     if(cursor==ARGO_LBRACE) {  //If json is an object, initalize it 
@@ -201,6 +202,7 @@ ARGO_VALUE *argo_read_value(FILE *f) {
     return NULL;
 
 }
+*/
 
 
 int argo_read_array(ARGO_VALUE *v, FILE *f) {
@@ -748,6 +750,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
     char cursor = argo_read_char(f);
     int neg = 0;
     if(cursor==ARGO_MINUS) {
+        argo_append_char(&(n->string_value), cursor);
         neg = 1;
         cursor=argo_read_char(f);
     }
@@ -870,12 +873,44 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
  * nonzero if there is any error.
  */
 
- /*
 int argo_write_value(ARGO_VALUE *v, FILE *f) {
-    // TO BE IMPLEMENTED.
-    abort();
+    if(v->type==1) { //basic
+        if(v->content.basic==0) { 
+            fputs(ARGO_NULL_TOKEN, f);
+            return 0;
+        }
+        else if(v->content.basic==1) {
+            fputs(ARGO_TRUE_TOKEN, f);
+            return 0;
+        }
+        else if(v->content.basic==2) {
+            fputs(ARGO_FALSE_TOKEN, f);
+            return 0;
+        }
+        else return -1;
+    }
+    else if(v->type==2) { //number
+        if(argo_write_number(&(v->content.number), f)!=-1) {
+            return 0;
+        }
+        else return -1;
+    }
+    else if(v->type==3) { //string
+        if(argo_write_string(&(v->content.string), f)!=-1) {
+            return 0;
+        }
+        else return -1;
+    }
+    else if(v->type==4) { //object
+
+    }
+    else if(v->type==5) { //array
+        ARGO_VALUE *pointer = v->content.array.element_list->next;
+
+    }
+    return -1;
 }
-*/
+
 
 /**
  * @brief  Write canonical JSON representing a specified string
@@ -898,12 +933,99 @@ int argo_write_value(ARGO_VALUE *v, FILE *f) {
  * nonzero if there is any error.
  */
 
- /*
+ 
 int argo_write_string(ARGO_STRING *s, FILE *f) {
-    // TO BE IMPLEMENTED.
-    abort();
+    ARGO_CHAR *cursor = s->content;
+    fputc(ARGO_QUOTE, f);
+    for(int i=0; i<s->length; i++) {
+        if(*cursor>31 && *cursor<256) {
+            if(*cursor==92) {
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_BSLASH, f);
+                cursor++;
+            }
+            else if(*cursor==34) {
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_QUOTE, f);
+                cursor++;
+            }
+            else {
+                fputc(*cursor, f);
+                cursor++;
+            }
+        }
+        else if(*cursor>-1 && *cursor<65536) {
+            if(*cursor==8) {
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_B, f);
+                cursor++;
+            }
+            else if(*cursor==9){
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_T, f);
+                cursor++;
+            }
+            else if(*cursor==10){
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_N, f);
+                cursor++;
+            }
+            else if(*cursor==12){
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_F, f);
+                cursor++;
+            }
+            else if(*cursor==13) {
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_R, f);
+                cursor++;
+            }
+            else {
+                double number= (double)*cursor;
+                double remainder=0;
+                number=number/16;
+                remainder=number-(int)number;
+                int one=(int)(remainder*16);
+                number=number/16;
+                remainder=number-(int)number;
+                int two=(int)(remainder*16);
+                number=number/16;
+                remainder=number-(int)number;
+                int three=(int)(remainder*16);
+                number=number/16;
+                remainder=number-(int)number;
+                int four=(int)(remainder*16);
+                if(one>9) 
+                    one=one+87;
+                else
+                    one=one+'0';
+                if(two>9) 
+                    two=two+87;
+                else
+                    two=two+'0';
+                if(three>9)
+                    three=three+87;
+                else
+                    three=three+'0';
+                if(four>9)
+                    four=four+87;
+                else
+                    four=four+'0';
+                fputc(ARGO_BSLASH, f);
+                fputc(ARGO_U, f);
+                fputc(four, f);
+                fputc(three, f);
+                fputc(two, f);
+                fputc(one, f);
+            }
+        }
+        else    
+            return -1;
+    }
+    fputc(ARGO_QUOTE, f);
+    return 0;
 }
-*/
+
 
 /**
  * @brief  Write canonical JSON representing a specified number
@@ -924,9 +1046,84 @@ int argo_write_string(ARGO_STRING *s, FILE *f) {
  * nonzero if there is any error.
  */
 
- /*
+
 int argo_write_number(ARGO_NUMBER *n, FILE *f) {
-    // TO BE IMPLEMENTED.
-    abort();
+    if(n->valid_int) {
+        for(int i=0; i<n->string_value.length; i++) {
+            fputc(*(n->string_value.content+i), f);
+        }
+        return 0;
+    }
+    else if(n->valid_float) {
+        if((n->float_value>=0.1 && n->float_value<1) || (n->float_value<=-0.1 && n->float_value>-1) || n->float_value==0.0) {
+            for(int i=0; i<n->string_value.length; i++) {
+                fputc(*(n->string_value.content+i), f);
+            }
+            return 0;
+        }
+        else if(n->float_value>-1 && n->float_value<1) {
+            int negative = 0;
+            int exponent_counter=0;
+            if(n->float_value<0) {
+                negative=1;
+                n->float_value=n->float_value*-1;
+            }
+            while(n->float_value<0.1) {
+                n->float_value=n->float_value*10;
+                exponent_counter++;
+            }
+            ARGO_CHAR *cursor = n->string_value.content;
+            while(*cursor<'1' || *cursor>'9')
+                cursor++;
+            if(negative)
+                fputc(ARGO_MINUS, f);
+            fputc('0', f);
+            fputc('.', f);
+            while(argo_is_digit(*cursor) || *cursor==ARGO_PERIOD) {
+                if(*cursor==ARGO_PERIOD) {
+                    cursor++;
+                    continue;
+                }
+                fputc(*cursor, f);
+                cursor++;
+            }
+            putc(ARGO_E, f);
+            putc(ARGO_MINUS,f);
+            putc(exponent_counter+'0', f);
+            return 0;
+        }
+        else {
+            int negative=0;
+            int exponent_counter=0;
+            if(n->float_value<0) {
+                negative=1;
+                n->float_value=n->float_value*-1;
+            }
+            while(n->float_value>=1) {
+                n->float_value=n->float_value/10;
+                exponent_counter++;
+            }
+            ARGO_CHAR *cursor = n->string_value.content;
+            while(*cursor<'1' || *cursor>'9')
+                cursor++;
+            if(negative)
+                fputc(ARGO_MINUS, f);
+            fputc('0', f);
+            fputc('.', f);
+            while(argo_is_digit(*cursor) || *cursor==ARGO_PERIOD) {
+                if(*cursor==ARGO_PERIOD) {
+                    cursor++;
+                    continue;
+                }
+                fputc(*cursor, f);
+                cursor++;
+            }
+            putc(ARGO_E, f);
+            putc(exponent_counter+'0', f);
+            return 0;
+        }
+    }
+    fprintf( stderr, "Error: writing invalid number");
+    return -1;
 }
-*/
+
