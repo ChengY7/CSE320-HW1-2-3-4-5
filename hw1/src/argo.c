@@ -94,7 +94,7 @@ ARGO_VALUE *argo_read_value(FILE *f) {
     else if(cursor==ARGO_QUOTE) {
         ARGO_VALUE *current_argo_value=(argo_value_storage+argo_next_value);
         argo_next_value++;
-        current_argo_value->type=2;
+        current_argo_value->type=3;
         current_argo_value->next=current_argo_value;
         current_argo_value->prev=current_argo_value;
         current_argo_value->name.content=NULL;
@@ -201,6 +201,7 @@ ARGO_VALUE *argo_read_value(FILE *f) {
     return NULL;
 
 }
+
 
 int argo_read_array(ARGO_VALUE *v, FILE *f) {
     ARGO_VALUE *sentinel = (argo_value_storage+argo_next_value);
