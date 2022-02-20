@@ -12,6 +12,8 @@ int argo_read_jsonLine(ARGO_VALUE *sentinel, FILE *f);
 int add_to_linkedList(ARGO_VALUE *sentinel, ARGO_VALUE *new_value);
 int argo_read_array(ARGO_VALUE *v, FILE *f);
 int argo_convert_hex_dec(FILE *f);
+int argo_write_object(ARGO_VALUE *v, FILE *f);
+int argo_write_array(ARGO_VALUE *v, FILE *f);
 
 /**
  * @brief  Read JSON input from a specified input stream, parse it,
@@ -35,7 +37,6 @@ int argo_convert_hex_dec(FILE *f);
  * NULL if there is any error.
  */
 
-/*
 ARGO_VALUE *argo_read_value(FILE *f) {
     ARGO_CHAR cursor = argo_read_char(f);        //read the first character
     if(cursor==ARGO_LBRACE) {  //If json is an object, initalize it 
@@ -202,7 +203,6 @@ ARGO_VALUE *argo_read_value(FILE *f) {
     return NULL;
 
 }
-*/
 
 
 int argo_read_array(ARGO_VALUE *v, FILE *f) {
@@ -872,7 +872,6 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
-
 int argo_write_value(ARGO_VALUE *v, FILE *f) {
     if(v->type==1) { //basic
         if(v->content.basic==0) { 
@@ -902,15 +901,117 @@ int argo_write_value(ARGO_VALUE *v, FILE *f) {
         else return -1;
     }
     else if(v->type==4) { //object
-
+        if(argo_write_object(v->content.object.member_list, f)!=-1) {
+            return 0;
+        }
+        else return -1;
     }
     else if(v->type==5) { //array
-        ARGO_VALUE *pointer = v->content.array.element_list->next;
-
+        if(argo_write_array(v->content.array.element_list, f)!=-1) {
+            return 0;
+        }
+        else return -1;
     }
     return -1;
 }
-
+int argo_write_array(ARGO_VALUE *v, FILE *f) {
+    fputc(ARGO_LBRACK, f);
+    ARGO_VALUE *pointer = v->next;
+    while(pointer!=v) {
+        if(pointer->type==1) {
+            if(pointer->content.basic==0)  
+                fputs(ARGO_NULL_TOKEN, f);
+            else if(pointer->content.basic==1) {
+                fputs(ARGO_TRUE_TOKEN, f);
+            }
+            else if(pointer->content.basic==2) {
+                fputs(ARGO_FALSE_TOKEN, f);
+            }
+            else return -1;
+        }
+        else if(pointer->type==2) {
+            if(argo_write_number(&(pointer->content.number), f)==-1) {
+                return -1;
+            }
+        }
+        else if(pointer->type==3) {
+            if(argo_write_string(&(pointer->content.string), f)==-1) {
+                return -1;
+            }
+        }
+        else if(pointer->type==4) {
+            if(argo_write_object(pointer->content.object.member_list, f)==-1) {
+                return -1;
+            }
+        }
+        else if(pointer->type==5) {
+            if(argo_write_array(pointer->content.array.element_list, f)==-1) {
+                return -1;
+            }
+        }
+        else return -1;
+        if(pointer->next!=v)
+            fputc(ARGO_COMMA, f);
+        pointer=pointer->next;
+    }
+    fputc(ARGO_RBRACK, f);
+    return 0;
+}
+int argo_write_object(ARGO_VALUE *v, FILE *f) {
+    fputc(ARGO_LBRACE, f);
+    ARGO_VALUE *pointer = v->next;
+    while(pointer!=v) {
+        if(pointer->type==1) {
+            if(argo_write_string(&(pointer->name), f)!=-1) {
+                fputc(ARGO_COLON, f);
+                if(pointer->content.basic==0)  
+                    fputs(ARGO_NULL_TOKEN, f);
+                else if(pointer->content.basic==1) {
+                    fputs(ARGO_TRUE_TOKEN, f);
+                }
+                else if(pointer->content.basic==2) {
+                    fputs(ARGO_FALSE_TOKEN, f);
+                }
+                else return -1;
+            }
+            else return -1;
+        }
+        else if(pointer->type==2) {
+            if(argo_write_string(&(pointer->name), f)!=-1) {
+                fputc(ARGO_COLON, f);
+                if(argo_write_number(&(pointer->content.number), f)==-1)
+                    return -1;
+            }
+        }
+        else if(pointer->type==3) {
+            if(argo_write_string(&(pointer->name), f)!=-1) {
+                fputc(ARGO_COLON, f);
+                if(argo_write_string(&(pointer->content.string), f)==-1)
+                    return -1;
+            }
+        }
+        else if(pointer->type==4) {
+            if(argo_write_string(&(pointer->name), f)!=-1) {
+                fputc(ARGO_COLON, f);
+                if(argo_write_object(pointer->content.object.member_list,f)==-1)
+                    return -1;
+            }
+        }
+        else if(pointer->type==5) {
+            if(argo_write_string(&(pointer->name), f)==-1) {
+                fputc(ARGO_COLON, f);
+                if(argo_write_array(pointer->content.array.element_list, f)==-1)
+                    return -1;
+            }
+        }
+        else return -1;
+        if(pointer->next!=v)
+            fputc(ARGO_COMMA, f);
+        pointer=pointer->next;
+    }
+    fputc(ARGO_RBRACE, f);
+    return 0;
+}
 
 /**
  * @brief  Write canonical JSON representing a specified string
@@ -1045,6 +1146,7 @@ int argo_write_string(ARGO_STRING *s, FILE *f) {
  * @return  Zero if the operation is completely successful,
  * nonzero if there is any error.
  */
+
 
 
 int argo_write_number(ARGO_NUMBER *n, FILE *f) {

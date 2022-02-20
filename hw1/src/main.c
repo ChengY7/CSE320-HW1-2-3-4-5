@@ -32,7 +32,10 @@ int main(int argc, char **argv)
     }
     if(global_options >= CANONICALIZE_OPTION) {
         struct argo_value *test = argo_read_value(stdin);
-        argo_write_value(test, stdout);
+        if(test!=NULL) {
+            if(argo_write_value(test, stdout)==0)
+                return EXIT_SUCCESS;
+        }
     }
     return EXIT_FAILURE;
 }
