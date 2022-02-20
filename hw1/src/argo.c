@@ -873,6 +873,7 @@ int argo_read_number(ARGO_NUMBER *n, FILE *f) {
  * nonzero if there is any error.
  */
 int argo_write_value(ARGO_VALUE *v, FILE *f) {
+    indent_level=0;
     if(v->type==1) { //basic
         if(v->content.basic==0) { 
             fputs(ARGO_NULL_TOKEN, f);
@@ -916,8 +917,18 @@ int argo_write_value(ARGO_VALUE *v, FILE *f) {
 }
 int argo_write_array(ARGO_VALUE *v, FILE *f) {
     fputc(ARGO_LBRACK, f);
+    if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+        indent_level++;
+        fputc(ARGO_LF, f);
+    }
     ARGO_VALUE *pointer = v->next;
     while(pointer!=v) {
+        if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+            int space=global_options-CANONICALIZE_OPTION-PRETTY_PRINT_OPTION;
+            space=space*indent_level;
+            for(int i=0; i<space; i++)
+                fputc(ARGO_SPACE, f);
+        }
         if(pointer->type==1) {
             if(pointer->content.basic==0)  
                 fputs(ARGO_NULL_TOKEN, f);
@@ -952,18 +963,39 @@ int argo_write_array(ARGO_VALUE *v, FILE *f) {
         else return -1;
         if(pointer->next!=v)
             fputc(ARGO_COMMA, f);
+        if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+            fputc(ARGO_LF, f);
+        }
         pointer=pointer->next;
+    }
+    if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+        indent_level--;
+        int space=global_options-CANONICALIZE_OPTION-PRETTY_PRINT_OPTION;
+        space=space*indent_level;
+        for(int i=0; i<space; i++)
+            fputc(ARGO_SPACE, f);
     }
     fputc(ARGO_RBRACK, f);
     return 0;
 }
 int argo_write_object(ARGO_VALUE *v, FILE *f) {
     fputc(ARGO_LBRACE, f);
+    if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+        indent_level++;
+        fputc(ARGO_LF, f);
+    }
     ARGO_VALUE *pointer = v->next;
     while(pointer!=v) {
+        if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+            int space=global_options-CANONICALIZE_OPTION-PRETTY_PRINT_OPTION;
+            space=space*indent_level;
+            for(int i=0; i<space; i++)
+                fputc(ARGO_SPACE, f);
+        }
         if(pointer->type==1) {
             if(argo_write_string(&(pointer->name), f)!=-1) {
                 fputc(ARGO_COLON, f);
+                fputc(ARGO_SPACE, f);
                 if(pointer->content.basic==0)  
                     fputs(ARGO_NULL_TOKEN, f);
                 else if(pointer->content.basic==1) {
@@ -979,6 +1011,7 @@ int argo_write_object(ARGO_VALUE *v, FILE *f) {
         else if(pointer->type==2) {
             if(argo_write_string(&(pointer->name), f)!=-1) {
                 fputc(ARGO_COLON, f);
+                fputc(ARGO_SPACE, f);
                 if(argo_write_number(&(pointer->content.number), f)==-1)
                     return -1;
             }
@@ -986,6 +1019,7 @@ int argo_write_object(ARGO_VALUE *v, FILE *f) {
         else if(pointer->type==3) {
             if(argo_write_string(&(pointer->name), f)!=-1) {
                 fputc(ARGO_COLON, f);
+                fputc(ARGO_SPACE, f);
                 if(argo_write_string(&(pointer->content.string), f)==-1)
                     return -1;
             }
@@ -993,6 +1027,7 @@ int argo_write_object(ARGO_VALUE *v, FILE *f) {
         else if(pointer->type==4) {
             if(argo_write_string(&(pointer->name), f)!=-1) {
                 fputc(ARGO_COLON, f);
+                fputc(ARGO_SPACE, f);
                 if(argo_write_object(pointer->content.object.member_list,f)==-1)
                     return -1;
             }
@@ -1000,6 +1035,7 @@ int argo_write_object(ARGO_VALUE *v, FILE *f) {
         else if(pointer->type==5) {
             if(argo_write_string(&(pointer->name), f)==-1) {
                 fputc(ARGO_COLON, f);
+                fputc(ARGO_SPACE, f);
                 if(argo_write_array(pointer->content.array.element_list, f)==-1)
                     return -1;
             }
@@ -1007,7 +1043,17 @@ int argo_write_object(ARGO_VALUE *v, FILE *f) {
         else return -1;
         if(pointer->next!=v)
             fputc(ARGO_COMMA, f);
+        if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+            fputc(ARGO_LF, f);
+        }
         pointer=pointer->next;
+    }
+    if(global_options>=CANONICALIZE_OPTION+PRETTY_PRINT_OPTION) {
+        indent_level--;
+        int space=global_options-CANONICALIZE_OPTION-PRETTY_PRINT_OPTION;
+        space=space*indent_level;
+        for(int i=0; i<space; i++)
+            fputc(ARGO_SPACE, f);
     }
     fputc(ARGO_RBRACE, f);
     return 0;
