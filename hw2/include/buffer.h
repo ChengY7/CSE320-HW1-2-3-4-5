@@ -15,7 +15,22 @@
 #include <stddef.h>
 
 
-struct buffer;
+struct buffer {
+  struct block *firstblk, /* The first block.                    */
+               *current,  /* The last non-empty block, or        */
+                          /* firstblk if all are empty.          */
+               *nextblk;  /* The block containing the item to be */
+                          /* returned by nextitem(), or NULL.    */
+  int nextindex;          /* Index of item in nextblock->items.  */
+  size_t itemsize;        /* The size of an item.                */
+};
+struct block {
+  struct block *next;  /* The next block, or NULL if none.              */
+  void *items;         /* Storage for the items in this block.          */
+  int maxhere,         /* Number of items that fit in *items.           */
+      numprevious,     /* Total of numhere for all previous blocks.     */
+      numhere;         /* The first numhere slots in *items are filled. */
+};
 
 
 struct buffer *newbuffer(size_t itemsize);

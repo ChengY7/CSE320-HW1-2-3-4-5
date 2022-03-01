@@ -12,6 +12,7 @@
 #include "buffer.h"    /* Also includes <stddef.h>.                       */
 #include "errmsg.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -43,8 +44,7 @@ static int choosebreaks(
 {
   struct word *w1, *w2;
   int linelen, shortest, newL, score, minlen, diff, sumsqdiff;
-  const char * const impossibility =
-    "Impossibility #%d has occurred. Please report it.\n";
+  const char * const impossibility = "Impossibility #%d has occurred. Please report it.\n";
 
 /* Determine maximum length of the shortest line: */
 
@@ -171,28 +171,28 @@ char **reformat(const char * const *inlines, int width,
 /* Count the input lines: */
 
   for (line = inlines;  *line;  ++line);
-  numin = line - inlines;
+  numin = line - inlines;                                    //numin is the number of lines
 
 /* Allocate space for pointers to the suffixes: */
 
-  if (numin) {
-    suffixes = malloc(numin * sizeof (const char *));
+  if (numin) {                                               //if numin exists
+    suffixes = malloc(numin * sizeof (const char *));        //malloc numin * sizeof(char*) space
     if (!suffixes) {
-      strcpy(errmsg,outofmem);
+      strcpy(errmsg,outofmem);                               //if out of mem then return error
       goto rfcleanup;
     }
   }
 
 /* Set the pointers to the suffixes, and create the words: */
 
-  affix = prefix + suffix;
+  affix = prefix + suffix;                                                       
   L = width - prefix - suffix;
 
   for (line = inlines, suf = suffixes;  *line;  ++line, ++suf) {
     for (end = *line;  *end;  ++end);
     if (end - *line < affix) {
       sprintf(errmsg,
-              "Line %d shorter than <prefix> + <suffix> = %d + %d = %d\n",
+              "Line %ld shorter than <prefix> + <suffix> = %d + %d = %d\n",
               line - inlines + 1, prefix, suffix, affix);
       goto rfcleanup;
     }
