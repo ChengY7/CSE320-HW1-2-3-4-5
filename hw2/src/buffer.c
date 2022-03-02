@@ -24,12 +24,29 @@
 #undef NULL
 #define NULL ((void *) 0)
 
+struct buffer {
+  struct block *firstblk, /* The first block.                    */
+               *current,  /* The last non-empty block, or        */
+                          /* firstblk if all are empty.          */
+               *nextblk;  /* The block containing the item to be */
+                          /* returned by nextitem(), or NULL.    */
+  int nextindex;          /* Index of item in nextblock->items.  */
+  size_t itemsize;        /* The size of an item.                */
+};
+struct block {
+  struct block *next;  /* The next block, or NULL if none.              */
+  void *items;         /* Storage for the items in this block.          */
+  int maxhere,         /* Number of items that fit in *items.           */
+      numprevious,     /* Total of numhere for all previous blocks.     */
+      numhere;         /* The first numhere slots in *items are filled. */
+};
+
 
 
 struct buffer *newbuffer(size_t itemsize) {
-  struct buffer *buf;     //init buffer
-  struct block *blk;      //init block
-  void *items;            //init *items, storage for the items in a block
+  struct buffer *buf=NULL;     //init buffer
+  struct block *blk=NULL;      //init block
+  void *items=NULL;            //init *items, storage for the items in a block
   int maxhere;            //init maxhere, number of items that can fit in *item
 
   maxhere = 124 / itemsize;   //maxhere =124/size of vairable
@@ -64,7 +81,7 @@ struct buffer *newbuffer(size_t itemsize) {
 
 void freebuffer(struct buffer *buf)
 {
-  struct block *blk, *tmp;
+  struct block *blk=NULL, *tmp=NULL;
 
   blk = buf->firstblk;
   while (blk) {
@@ -80,7 +97,7 @@ void freebuffer(struct buffer *buf)
 
 void clearbuffer(struct buffer *buf)
 {
-  struct block *blk;
+  struct block *blk=NULL;
 
   for (blk = buf->firstblk;  blk;  blk = blk->next) {
     blk->numhere = 0;
@@ -91,8 +108,8 @@ void clearbuffer(struct buffer *buf)
 }
 
 void additem(struct buffer *buf, const void *item) {
-  struct block *blk, *new;
-  void *items;
+  struct block *blk=NULL, *new=NULL;
+  void *items=NULL;
   int maxhere;
   size_t itemsize = buf->itemsize;         //get the itemsize of the current buffer
 
@@ -140,8 +157,8 @@ int numitems(struct buffer *buf)
 
 void *copyitems(struct buffer *buf) {
   int n;
-  void *r;
-  struct block *blk, *b;
+  void *r=NULL;
+  struct block *blk=NULL, *b=NULL;
   size_t itemsize = buf->itemsize;
 
   b = buf->current;                      //b = current block of buffer
@@ -174,7 +191,7 @@ void rewindbuffer(struct buffer *buf)
 
 void *nextitem(struct buffer *buf)
 {
-  void *r;
+  void *r=NULL;
 
   if (!buf->nextblk || buf->nextindex >= buf->nextblk->numhere)
     return NULL;

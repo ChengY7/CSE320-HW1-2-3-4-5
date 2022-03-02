@@ -42,7 +42,7 @@ static int choosebreaks(
 /* min is <min>). head must point to a dummy word, and tail  */
 /* must point to the last word. Returns <newL>. Uses errmsg. */
 {
-  struct word *w1, *w2;
+  struct word *w1=NULL, *w2=NULL;
   int linelen, shortest, newL, score, minlen, diff, sumsqdiff;
   const char * const impossibility = "Impossibility #%d has occurred. Please report it.\n";
 
@@ -157,9 +157,9 @@ char **reformat(const char * const *inlines, int width,
                 int prefix, int suffix, int hang, int last, int min)
 {
   int numin, numout, affix, L, linelen, newL;
-  const char * const *line, **suffixes = NULL, **suf, *end, *p1, *p2;
-  char *q1, *q2, **outlines;
-  struct word dummy, *head, *tail, *w1, *w2;
+  const char * const *line=NULL, **suffixes = NULL, **suf=NULL, *end=NULL, *p1=NULL, *p2=NULL;
+  char *q1=NULL, *q2=NULL, **outlines=NULL;
+  struct word dummy, *head=NULL, *tail=NULL, *w1=NULL, *w2=NULL;
   struct buffer *pbuf = NULL;
 
 /* Initialization: */

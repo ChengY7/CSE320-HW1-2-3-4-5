@@ -117,7 +117,7 @@ badopt:
 static char **readlines(void) {
   struct buffer *cbuf = NULL, *pbuf = NULL;
   int c, blank;
-  char ch, *ln, *nullline = NULL, nullchar = '\0', **lines = NULL;
+  char ch, *ln=NULL, *nullline = NULL, nullchar = '\0', **lines = NULL;
 
   cbuf = newbuffer(sizeof (char));
   if (*errmsg) goto rlcleanup;
@@ -163,16 +163,18 @@ static char **readlines(void) {
   lines = copyitems(pbuf);
 
 rlcleanup:
-
   if (cbuf) freebuffer(cbuf);
   if (pbuf) {
-    if (!lines)
+    if (!lines) {
       for (;;) {
         lines = nextitem(pbuf);
         if (!lines) break;
         free(*lines);
       }
+    }
+    freebuffer(pbuf);
   }
+
 
   return lines;
 }
@@ -182,7 +184,7 @@ rlcleanup:
 /* to "par.doc". Does not use errmsg because it always succeeds.        */
 static void setdefaults(const char * const *inlines, int *pwidth, int *pprefix, int *psuffix, int *phang, int *plast, int *pmin) {
   int numlines;
-  const char *start, *end, * const *line, *p1, *p2;
+  const char *start=NULL, *end=NULL, * const *line=NULL, *p1=NULL, *p2=NULL;
   if (*pwidth < 0) *pwidth = 72;
   if (*phang < 0) *phang = 0;
   if (*plast < 0) *plast = 0;
@@ -230,18 +232,21 @@ static void freelines(char **lines)
 /* Frees the strings pointed to in the NULL-terminated array lines, then */
 /* frees the array. Does not use errmsg because it always succeeds.      */
 {
-  char *line;
-
-  for (line = *lines;  *line;  ++line)
+  char *line=NULL;
+  char **temp = lines;
+  
+  for (line = *lines;  *lines;) {
     free(line);
-
-  free(lines);
+    lines++;
+    line=*lines;
+  }
+  free(temp);
 }
 
 
 int original_main(int argc, const char * const *argv) {
   int width, widthbak = -1, prefix, prefixbak = -1, suffix, suffixbak = -1, hang, hangbak = -1, last, lastbak = -1, min, minbak = -1, c;
-  char *parinit, *picopy = NULL, *opt, **inlines = NULL, **outlines = NULL, **line;
+  char *parinit=NULL, *picopy = NULL, *opt=NULL, **inlines = NULL, **outlines = NULL, **line=NULL;
   const char * const whitechars = " \f\n\r\t\v";
   parinit = getenv("PARINIT");
   if (parinit) {                         //If enviroment variable parinit is enabled
