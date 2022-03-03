@@ -16,14 +16,23 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <getopt.h>
 
 #undef NULL
 #define NULL ((void *) 0)
 
-
+int is_int(char *str);
 const char * const progname = "par";
 const char * const version = "3.20";
 
+int is_int(char *str) {
+  while(*str!='\0') {
+    if (*str<48 || *str>57) 
+      return 0;
+    str++;
+  }
+  return 1;
+}
 /* Returns the value represented by the digit c,   */
 /* or -1 if c is not a digit. Does not use errmsg. */
 static int digtoint(char c) {
@@ -56,7 +65,7 @@ static int strtoudec(const char *s, int *pn) {
   do {
     if (!isdigit(*s)) return 0;  //if encounter non digit then return error
     n = (10 * n) + digtoint(*s);
-    if (n >= 1000) return 0;     //if n>999 then its an error
+    if (n >= 10000) return 0;     //if n>999 then its an error
   } while (*++s);
 
   *pn = n;
@@ -64,51 +73,6 @@ static int strtoudec(const char *s, int *pn) {
   return 1;
 }
 
-/* Parses the single option in opt, setting *pwidth, *pprefix,     */
-/* *psuffix, *phang, *plast, or *pmin as appropriate. Uses errmsg. */
-static void parseopt(const char *opt, int *pwidth, int *pprefix, int *psuffix, int *phang, int *plast, int *pmin) {
-  const char *saveopt = opt;      //make a copy of opt that points the beginning of the option
-  char oc;
-  int n, r;
-
-  if (*opt == '-') ++opt;         //if option is '-' then we move to next option
-
-  if (!strcmp(opt, "version")) {
-    sprintf(errmsg, "%s %s\n", progname, version);  //if option is version then print version number
-    return;
-  }
-  oc = *opt; //save the next char of opt in oc
-  if (isdigit(oc)) {                               //if oc is digit
-    if (!strtoudec(opt, &n)) goto badopt;          //convert option to int if error then goto badopt
-    if (n <= 8) *pprefix = n;                      //if n is 8 or less, n sets to prefix
-    else *pwidth = n;                              //if n is 9 or more, n sets to width
-  }
-  else {
-    if (!oc) goto badopt;                    //if oc is null go to badopt
-    n = 1;                                   //This is case for -[letter][number]
-    r = strtoudec(opt + 1, &n);              //get the number and store it inside n
-    if (opt[1] && !r) goto badopt;           //If number exist but r==0 then it's an error because strtoudec casued an error
-
-    if (oc == 'w' || oc == 'p' || oc == 's') {
-      if (!r) goto badopt;                   //-w, -p, -s needs a number after or r is going to be 0. If r is false go to badopt
-      if      (oc == 'w') *pwidth  = n;      //set -w
-      else if (oc == 'p') *pprefix = n;      //set -p
-      else                *psuffix = n;      //set -s
-    }
-    else if (oc == 'h') *phang = n;          //set -h, if h given without number then value 1 is assumed
-    else if (n <= 1) {                       // n==0 or 1 then consider -l and -m
-      if      (oc == 'l') *plast = n;       
-      else if (oc == 'm') *pmin = n;
-    }
-    else goto badopt;                        //everything else go to badopt
-  }
-
-  *errmsg = '\0';
-  return;
-
-badopt:
-  sprintf(errmsg, "Bad option: %.149s\n", saveopt);
-}
 
 /* Reads lines from stdin until EOF, or until a blank line is encountered, */
 /* in which case the newline is pushed back onto the input stream. Returns */
@@ -244,7 +208,7 @@ static void freelines(char **lines)
 }
 
 
-int original_main(int argc, const char * const *argv) {
+int original_main(int argc, char * const *argv) {
   int width, widthbak = -1, prefix, prefixbak = -1, suffix, suffixbak = -1, hang, hangbak = -1, last, lastbak = -1, min, minbak = -1, c;
   char *parinit=NULL, *picopy = NULL, *opt=NULL, **inlines = NULL, **outlines = NULL, **line=NULL;
   const char * const whitechars = " \f\n\r\t\v";
@@ -258,17 +222,129 @@ int original_main(int argc, const char * const *argv) {
     strcpy(picopy,parinit);
     opt = strtok(picopy,whitechars);
     while (opt) {
-      parseopt(opt, &widthbak, &prefixbak, &suffixbak, &hangbak, &lastbak, &minbak);
+      //parseopt(opt, &widthbak, &prefixbak, &suffixbak, &hangbak, &lastbak, &minbak);
       if (*errmsg) goto parcleanup;
       opt = strtok(NULL,whitechars);
     }
     free(picopy);
     picopy = NULL;
   }
-  while (*++argv) {            
-    parseopt(*argv, &widthbak, &prefixbak, &suffixbak, &hangbak, &lastbak, &minbak);  //loop through argv and call parseopt
-    if (*errmsg) goto parcleanup;
+  int opt_char;
+  int option_index=0;
+  static int last_flag=-1;
+  static int min_flag=-1;
+  static int version_flag=0;
+  static struct option long_options[]={
+    {"version", no_argument, &version_flag, 1},
+    {"width", required_argument, 0, 'w'},
+    {"prefix", required_argument, 0,'p'},
+    {"suffix", required_argument, 0, 's'},
+    {"hang", optional_argument, 0, 'h'},
+    {"no-last", no_argument, &last_flag, 0},
+    {"last", no_argument, &last_flag, 1},
+    {"no-min", no_argument, &min_flag, 0},
+    {"min", no_argument, &min_flag, 1},
+    {0, 0, 0, 0}
+  };
+  loop:
+  if(optind<argc && is_int(argv[optind])) {
+    int temp=-1;
+    optarg=argv[optind++];
+    if(!(strtoudec(optarg, &temp))) {
+      sprintf(errmsg, "invalid number: %s\n", argv[optind]);
+      goto parcleanup;
+    }
+    else {
+      if(temp<=8)
+        prefixbak=temp;
+      else
+        widthbak=temp;
+    }
+    if(optind<argc && is_int(argv[optind]))
+      goto loop;
   }
+  while((opt_char = getopt_long(argc, argv, "w:p:s:h::l::m::", long_options, &option_index)) != -1) {
+    if(version_flag) {
+      sprintf(errmsg, "%s %s\n", progname, version);  //if option is version then print version number
+      goto parcleanup;
+    }
+    if(min_flag==1)
+      minbak=1;
+    if(min_flag==0)
+      minbak=0;
+    if(last_flag==1)
+      lastbak=1;
+    if(last_flag==0)
+      lastbak=0;
+    switch(opt_char) {
+      case 'w':
+        if(!(strtoudec(optarg, &widthbak))) {
+          sprintf(errmsg, "invalid number: %s\n", optarg);
+          goto parcleanup;
+        }
+        break;
+      case 'p':
+        if(!(strtoudec(optarg, &prefixbak))) {
+          sprintf(errmsg, "invalid number: %s\n", optarg);
+          goto parcleanup;
+        }
+        break;
+      case 's':
+        if(!(strtoudec(optarg, &suffixbak))) {
+          sprintf(errmsg, "invalid number: %s\n", optarg);
+          goto parcleanup;
+        }
+        break;
+      case 'h':
+        if (optarg == NULL && optind < argc && argv[optind][0] != '-') 
+          optarg = argv[optind++];
+        if (optarg==NULL)  //no arg
+          hangbak=1;
+        else               //yes arg
+          if(!(strtoudec(optarg, &hangbak))) {
+            sprintf(errmsg, "invalid number: %s\n", optarg);
+            goto parcleanup;
+          }
+        break;
+      case 'm':
+        if (optarg == NULL && optind < argc && argv[optind][0] != '-')
+          optarg = argv[optind++];
+        if (optarg==NULL)
+          minbak=1;
+        else {
+          if(!(strtoudec(optarg, &minbak))) {
+            sprintf(errmsg, "invalid number: %s\n", optarg);
+            goto parcleanup;
+          }
+          if(minbak!=0 && minbak!=1) {
+            sprintf(errmsg, "Min can only be 0 or 1\n");
+            goto parcleanup;
+          }
+        }
+        break;
+      case 'l':
+        if (optarg == NULL && optind < argc && argv[optind][0] != '-')
+          optarg = argv[optind++];
+        if (optarg==NULL)
+          lastbak=1;
+        else {
+          if(!(strtoudec(optarg, &lastbak))) {
+            sprintf(errmsg, "invalid number: %s\n", optarg);
+            goto parcleanup;
+          }
+          if(lastbak!=0 && lastbak!=1) {
+            sprintf(errmsg, "Last can only be 0 or 1\n");
+            goto parcleanup;
+          }
+        }
+        break;
+      default:
+        break;
+    }
+    if(optind<argc && is_int(argv[optind]))
+      goto loop;
+  }
+  //printf("Width: %d Prefix: %d Suffix: %d Hang: %d Min: %d Last: %d\n", widthbak, prefixbak, suffixbak, hangbak, minbak, lastbak);
   
   for (;;) {
     for (;;) {
