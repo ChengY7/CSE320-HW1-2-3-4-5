@@ -37,6 +37,7 @@ int report_error(FILE *file) {
 }
 void clear_error() {
     if(is_error()) {
+        errmsg=NULL;
         free(errmsg);
     }
 }

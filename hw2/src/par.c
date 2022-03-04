@@ -22,7 +22,7 @@
 #define NULL ((void *) 0)
 
 int is_int(char *str);
-const char * const progname = "par";
+const char * const progname = "par ";
 const char * const version = "3.20";
 
 int is_int(char *str) {
@@ -288,6 +288,8 @@ int original_main(int argc, char * const *argv) {
       strcat(tempError, version);
       set_error(tempError);
       free(tempError);
+      report_error(stdout);
+      clear_error();
       goto parcleanup;
     }
     if(min_flag==1)
