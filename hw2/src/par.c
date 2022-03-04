@@ -84,9 +84,9 @@ static char **readlines(void) {
   char ch, *ln=NULL, *nullline = NULL, nullchar = '\0', **lines = NULL;
 
   cbuf = newbuffer(sizeof (char));
-  if (*errmsg) goto rlcleanup;
+  if (is_error()) goto rlcleanup;
   pbuf = newbuffer(sizeof (char *));
-  if (*errmsg) goto rlcleanup;
+  if (is_error()) goto rlcleanup;
 
   for (blank = 1;  ; ) {            //some kind of loop
     c = getchar();                  //get the char
@@ -97,11 +97,11 @@ static char **readlines(void) {
         break;
       }
       additem(cbuf, &nullchar);     //add '\0' to buffer
-      if (*errmsg) goto rlcleanup;
+      if (is_error()) goto rlcleanup;
       ln = copyitems(cbuf);         //copy items in cbuf to ln
-      if (*errmsg) goto rlcleanup;
+      if (is_error()) goto rlcleanup;
       additem(pbuf, &ln);            //add char* ln into pbuf
-      if (*errmsg) goto rlcleanup;
+      if (is_error()) goto rlcleanup;
       clearbuffer(cbuf);
       blank = 1;
     }
@@ -109,21 +109,21 @@ static char **readlines(void) {
       if (!isspace(c)) blank = 0;
       ch = c;
       additem(cbuf, &ch);
-      if (*errmsg) goto rlcleanup;
+      if (is_error()) goto rlcleanup;
     }
   }
 
   if (!blank) {                     //If we run into EOF
     additem(cbuf, &nullchar);       //add '/0' to cbuf
-    if (*errmsg) goto rlcleanup;
+    if (is_error()) goto rlcleanup;
     ln = copyitems(cbuf);           //copy items of cbuf to ln
-    if (*errmsg) goto rlcleanup;
+    if (is_error()) goto rlcleanup;
     additem(pbuf, &ln);             //add char* ln to pbuf
-    if (*errmsg) goto rlcleanup;
+    if (is_error()) goto rlcleanup;
   }
 
   additem(pbuf, &nullline);         //add '/0' to pbuf
-  if (*errmsg) goto rlcleanup;
+  if (is_error()) goto rlcleanup;
   lines = copyitems(pbuf);
 
 rlcleanup:
@@ -212,18 +212,22 @@ int original_main(int argc, char * const *argv) {
   int width, widthbak = -1, prefix, prefixbak = -1, suffix, suffixbak = -1, hang, hangbak = -1, last, lastbak = -1, min, minbak = -1, c;
   char *parinit=NULL, *picopy = NULL, *opt=NULL, **inlines = NULL, **outlines = NULL, **line=NULL;
   const char * const whitechars = " \f\n\r\t\v";
+  char *tempChar=NULL;
+  char *tempError=NULL;
+  char *invalidNum = "invalid number: ";
+  char *invalidOpt = "invalid option: ";
   parinit = getenv("PARINIT");
   if (parinit) {                         //If enviroment variable parinit is enabled
     picopy = malloc((strlen(parinit) + 1) * sizeof (char));
     if (!picopy) {
-      strcpy(errmsg,outofmem);
+      set_error("Out of memory.\n");
       goto parcleanup;
     }
     strcpy(picopy,parinit);
     opt = strtok(picopy,whitechars);
     while (opt) {
       //parseopt(opt, &widthbak, &prefixbak, &suffixbak, &hangbak, &lastbak, &minbak);
-      if (*errmsg) goto parcleanup;
+      if (is_error()) goto parcleanup;
       opt = strtok(NULL,whitechars);
     }
     free(picopy);
@@ -251,7 +255,12 @@ int original_main(int argc, char * const *argv) {
     int temp=-1;
     optarg=argv[optind++];
     if(!(strtoudec(optarg, &temp))) {
-      sprintf(errmsg, "invalid number: %s\n", argv[optind]);
+      tempChar=argv[optind];
+      tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+      strcpy(tempError, invalidNum);
+      strcat(tempError, tempChar);
+      set_error(tempError);
+      free(tempError);
       goto parcleanup;
     }
     else {
@@ -263,9 +272,22 @@ int original_main(int argc, char * const *argv) {
     if(optind<argc && is_int(argv[optind]))
       goto loop;
   }
+  if(optind<argc && (argv[optind][0])!='-') {
+    tempChar=argv[optind];
+    tempError=malloc(strlen(tempChar) + strlen(invalidOpt) +1);
+    strcpy(tempError, invalidOpt);
+    strcat(tempError, tempChar);
+    set_error(tempError);
+    free(tempError);
+    goto parcleanup;
+  }
   while((opt_char = getopt_long(argc, argv, "w:p:s:h::l::m::", long_options, &option_index)) != -1) {
     if(version_flag) {
-      sprintf(errmsg, "%s %s\n", progname, version);  //if option is version then print version number
+      tempError=malloc(strlen(progname) + strlen(version) +1);
+      strcpy(tempError, progname);
+      strcat(tempError, version);
+      set_error(tempError);
+      free(tempError);
       goto parcleanup;
     }
     if(min_flag==1)
@@ -279,19 +301,34 @@ int original_main(int argc, char * const *argv) {
     switch(opt_char) {
       case 'w':
         if(!(strtoudec(optarg, &widthbak))) {
-          sprintf(errmsg, "invalid number: %s\n", optarg);
+          tempChar=optarg;
+          tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+          strcpy(tempError, invalidNum);
+          strcat(tempError, tempChar);
+          set_error(tempError);
+          free(tempError);
           goto parcleanup;
         }
         break;
       case 'p':
         if(!(strtoudec(optarg, &prefixbak))) {
-          sprintf(errmsg, "invalid number: %s\n", optarg);
+          tempChar=optarg;
+          tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+          strcpy(tempError, invalidNum);
+          strcat(tempError, tempChar);
+          set_error(tempError);
+          free(tempError);
           goto parcleanup;
         }
         break;
       case 's':
         if(!(strtoudec(optarg, &suffixbak))) {
-          sprintf(errmsg, "invalid number: %s\n", optarg);
+          tempChar=optarg;
+          tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+          strcpy(tempError, invalidNum);
+          strcat(tempError, tempChar);
+          set_error(tempError);
+          free(tempError);
           goto parcleanup;
         }
         break;
@@ -302,7 +339,12 @@ int original_main(int argc, char * const *argv) {
           hangbak=1;
         else               //yes arg
           if(!(strtoudec(optarg, &hangbak))) {
-            sprintf(errmsg, "invalid number: %s\n", optarg);
+            tempChar=optarg;
+            tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+            strcpy(tempError, invalidNum);
+            strcat(tempError, tempChar);
+            set_error(tempError);
+            free(tempError);
             goto parcleanup;
           }
         break;
@@ -313,11 +355,17 @@ int original_main(int argc, char * const *argv) {
           minbak=1;
         else {
           if(!(strtoudec(optarg, &minbak))) {
-            sprintf(errmsg, "invalid number: %s\n", optarg);
+            tempChar=optarg;
+            tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+            strcpy(tempError, invalidNum);
+            strcat(tempError, tempChar);
+            set_error(tempError);
+            free(tempError);
             goto parcleanup;
           }
           if(minbak!=0 && minbak!=1) {
-            sprintf(errmsg, "Min can only be 0 or 1\n");
+            tempError="Min can only be 0 or 1\n";
+            set_error(tempError);
             goto parcleanup;
           }
         }
@@ -329,11 +377,17 @@ int original_main(int argc, char * const *argv) {
           lastbak=1;
         else {
           if(!(strtoudec(optarg, &lastbak))) {
-            sprintf(errmsg, "invalid number: %s\n", optarg);
+            tempChar=optarg;
+            tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+            strcpy(tempError, invalidNum);
+            strcat(tempError, tempChar);
+            set_error(tempError);
+            free(tempError);
             goto parcleanup;
           }
           if(lastbak!=0 && lastbak!=1) {
-            sprintf(errmsg, "Last can only be 0 or 1\n");
+            tempError=("Last can only be 0 or 1\n");
+            set_error(tempError);
             goto parcleanup;
           }
         }
@@ -343,6 +397,15 @@ int original_main(int argc, char * const *argv) {
     }
     if(optind<argc && is_int(argv[optind]))
       goto loop;
+    if(optind<argc && (argv[optind][0])!='-') {
+      tempChar=argv[optind];
+      tempError=malloc(strlen(tempChar) + strlen(invalidOpt) + 1);
+      strcpy(tempError, invalidOpt);
+      strcat(tempError, tempChar);
+      set_error(tempError);
+      free(tempError);
+      goto parcleanup;
+    }
   }
   //printf("Width: %d Prefix: %d Suffix: %d Hang: %d Min: %d Last: %d\n", widthbak, prefixbak, suffixbak, hangbak, minbak, lastbak);
   
@@ -355,7 +418,7 @@ int original_main(int argc, char * const *argv) {
     }
     ungetc(c,stdin);                    //The above code gets rid of newlines in the beginnning
     inlines = readlines();              //reads the lines of a file and store it in **inline
-    if (*errmsg) goto parcleanup;
+    if (is_error()) goto parcleanup;
     if (!*inlines) {
       free(inlines);
       inlines = NULL;
@@ -367,7 +430,7 @@ int original_main(int argc, char * const *argv) {
     if (width <= prefix+suffix)
      goto parcleanup;
     outlines = reformat((const char * const *) inlines, width, prefix, suffix, hang, last, min);
-    if (*errmsg) goto parcleanup;
+    if (is_error()) goto parcleanup;
     freelines(inlines);
     inlines = NULL;
     for (line = outlines;  *line;  ++line)
@@ -382,8 +445,9 @@ parcleanup:
   if (inlines) freelines(inlines);
   if (outlines) freelines(outlines);
 
-  if (*errmsg) {
-    fprintf(stderr, "%.163s", errmsg);
+  if (is_error()) {
+    report_error(stdout);
+    clear_error();
     exit(EXIT_FAILURE);
   }
 

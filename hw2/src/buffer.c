@@ -56,7 +56,7 @@ struct buffer *newbuffer(size_t itemsize) {
   blk = (struct block *) malloc(sizeof (struct block));    //malloc space for block
   items = malloc(maxhere * itemsize);                      //malloc space for items (max number of items * itemsize)
   if (!buf || !blk || !items) {                         
-    strcpy(errmsg,outofmem);                               //if outofmem the its error
+    set_error("Out of memory.\n");
     goto nberror;
   }
 
@@ -68,7 +68,6 @@ struct buffer *newbuffer(size_t itemsize) {
   blk->items = items;                                      //declear *item
   blk->next=NULL;
 
-  *errmsg = '\0';
   return buf;                                              //return the newley created buffer
 
   nberror:                                                  //if error, free everything and return NULL
@@ -122,7 +121,7 @@ void additem(struct buffer *buf, const void *item) {
       new = (struct block * ) malloc(sizeof (struct block));   //malloc space for the new block
       items = malloc(maxhere * itemsize);                      //malloc space for the item inside the new block
       if (!new || !items) {
-        strcpy(errmsg,outofmem);                               //if !new !items when out of memeory go to aierror
+        set_error("Out of memory.\n");
         goto aierror;
       }
       blk->next = new;                                         //declear next block
@@ -139,7 +138,6 @@ void additem(struct buffer *buf, const void *item) {
   memcpy( ((char *) blk->items) + (blk->numhere * itemsize), item, itemsize );  //copy item to next spot in blk->item
   
   ++blk->numhere; 
-  *errmsg = '\0';
   return;                      //return 
 
   aierror:
@@ -166,8 +164,8 @@ void *copyitems(struct buffer *buf) {
   if (!n) return NULL;                   //if nothing in the item return NULL
 
   r = malloc(n * itemsize);              //malloc (num of item * item size) space
-  if (!r) {            
-    strcpy(errmsg,outofmem);             //if !r then return out of memory error
+  if (!r) {       
+    set_error("Out of memory.\n");
     return NULL;  
   }
 
@@ -177,7 +175,6 @@ void *copyitems(struct buffer *buf) {
     memcpy( ((char *) r) + (blk->numprevious * itemsize),   //copy each block's item into r
             blk->items, blk->numhere * itemsize);
 
-  *errmsg = '\0';
   return r;                                //return r
 }
 
