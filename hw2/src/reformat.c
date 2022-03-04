@@ -76,6 +76,10 @@ static int choosebreaks(
     if (w1->score < 0) {
       tempChar="1";
       tempError=malloc(strlen(impossibility) + strlen(impossibility2) + strlen(tempChar) + 1);
+      if(!tempError) {
+        set_error("Out of memory.\n");
+        return 0;
+      }
       tempError=strcpy(tempError, impossibility);
       tempError=strcat(tempError, tempChar);
       tempError=strcat(tempError, impossibility2);
@@ -121,6 +125,10 @@ static int choosebreaks(
     if (newL > L) {
       tempChar="2";
       tempError=malloc(strlen(impossibility) + strlen(impossibility2) + strlen(tempChar) + 1);
+      if(!tempError) {
+        set_error("Out of memory.\n");
+        return 0;
+      }
       tempError=strcpy(tempError, impossibility);
       tempError=strcat(tempError, tempChar);
       tempError=strcat(tempError, impossibility2);
@@ -161,6 +169,10 @@ static int choosebreaks(
   if (head->next && head->next->score < 0) {
     tempChar="3";
     tempError=malloc(strlen(impossibility) + strlen(impossibility2) + strlen(tempChar) + 1);
+    if(!tempError) {
+        set_error("Out of memory.\n");
+        return 0;
+      }
     tempError=strcpy(tempError, impossibility);
     tempError=strcat(tempError, tempChar);
     tempError=strcat(tempError, impossibility2);

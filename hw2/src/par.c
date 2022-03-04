@@ -215,7 +215,7 @@ int original_main(int argc, char * const *argv) {
   char *tempChar=NULL;
   char *tempError=NULL;
   char *invalidNum = "invalid number: ";
-  char *invalidOpt = "invalid option: ";
+  char *invalidOpt = "bad option: ";
   parinit = getenv("PARINIT");
   if (parinit) {                         //If enviroment variable parinit is enabled
     picopy = malloc((strlen(parinit) + 1) * sizeof (char));
@@ -255,8 +255,12 @@ int original_main(int argc, char * const *argv) {
     int temp=-1;
     optarg=argv[optind++];
     if(!(strtoudec(optarg, &temp))) {
-      tempChar=argv[optind];
+      tempChar=optarg;
       tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+      if(!tempError) {
+        set_error("Out of memory.\n");
+        goto parcleanup;
+      }
       strcpy(tempError, invalidNum);
       strcat(tempError, tempChar);
       set_error(tempError);
@@ -275,6 +279,23 @@ int original_main(int argc, char * const *argv) {
   if(optind<argc && (argv[optind][0])!='-') {
     tempChar=argv[optind];
     tempError=malloc(strlen(tempChar) + strlen(invalidOpt) +1);
+    if(!tempError) {
+      set_error("Out of memory.\n");
+      goto parcleanup;
+    }
+    strcpy(tempError, invalidOpt);
+    strcat(tempError, tempChar);
+    set_error(tempError);
+    free(tempError);
+    goto parcleanup;
+  }
+  if(optind<argc && strcmp(argv[optind], "-")==0) {
+    tempChar=argv[optind];
+    tempError=malloc(strlen(tempChar) + strlen(invalidOpt) +1);
+    if(!tempError) {
+      set_error("Out of memory.\n");
+      goto parcleanup;
+    }
     strcpy(tempError, invalidOpt);
     strcat(tempError, tempChar);
     set_error(tempError);
@@ -284,6 +305,10 @@ int original_main(int argc, char * const *argv) {
   while((opt_char = getopt_long(argc, argv, "w:p:s:h::l::m::", long_options, &option_index)) != -1) {
     if(version_flag) {
       tempError=malloc(strlen(progname) + strlen(version) +1);
+      if(!tempError) {
+        set_error("Out of memory.\n");
+        goto parcleanup;
+      }
       strcpy(tempError, progname);
       strcat(tempError, version);
       set_error(tempError);
@@ -305,6 +330,10 @@ int original_main(int argc, char * const *argv) {
         if(!(strtoudec(optarg, &widthbak))) {
           tempChar=optarg;
           tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+          if(!tempError) {
+            set_error("Out of memory.\n");
+            goto parcleanup;
+          }
           strcpy(tempError, invalidNum);
           strcat(tempError, tempChar);
           set_error(tempError);
@@ -316,6 +345,10 @@ int original_main(int argc, char * const *argv) {
         if(!(strtoudec(optarg, &prefixbak))) {
           tempChar=optarg;
           tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+          if(!tempError) {
+            set_error("Out of memory.\n");
+            goto parcleanup;
+          }
           strcpy(tempError, invalidNum);
           strcat(tempError, tempChar);
           set_error(tempError);
@@ -327,6 +360,10 @@ int original_main(int argc, char * const *argv) {
         if(!(strtoudec(optarg, &suffixbak))) {
           tempChar=optarg;
           tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+          if(!tempError) {
+            set_error("Out of memory.\n");
+            goto parcleanup;
+          }
           strcpy(tempError, invalidNum);
           strcat(tempError, tempChar);
           set_error(tempError);
@@ -343,6 +380,10 @@ int original_main(int argc, char * const *argv) {
           if(!(strtoudec(optarg, &hangbak))) {
             tempChar=optarg;
             tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+            if(!tempError) {
+              set_error("Out of memory.\n");
+              goto parcleanup;
+            }
             strcpy(tempError, invalidNum);
             strcat(tempError, tempChar);
             set_error(tempError);
@@ -359,6 +400,10 @@ int original_main(int argc, char * const *argv) {
           if(!(strtoudec(optarg, &minbak))) {
             tempChar=optarg;
             tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+            if(!tempError) {
+              set_error("Out of memory.\n");
+              goto parcleanup;
+            }
             strcpy(tempError, invalidNum);
             strcat(tempError, tempChar);
             set_error(tempError);
@@ -381,6 +426,10 @@ int original_main(int argc, char * const *argv) {
           if(!(strtoudec(optarg, &lastbak))) {
             tempChar=optarg;
             tempError=malloc(strlen(tempChar) + strlen(invalidNum) + 1);
+            if(!tempError) {
+              set_error("Out of memory.\n");
+              goto parcleanup;
+            }
             strcpy(tempError, invalidNum);
             strcat(tempError, tempChar);
             set_error(tempError);
@@ -402,6 +451,23 @@ int original_main(int argc, char * const *argv) {
     if(optind<argc && (argv[optind][0])!='-') {
       tempChar=argv[optind];
       tempError=malloc(strlen(tempChar) + strlen(invalidOpt) + 1);
+      if(!tempError) {
+        set_error("Out of memory.\n");
+        goto parcleanup;
+      }
+      strcpy(tempError, invalidOpt);
+      strcat(tempError, tempChar);
+      set_error(tempError);
+      free(tempError);
+      goto parcleanup;
+    }
+    if(optind<argc && strcmp(argv[optind], "-")==0) {
+      tempChar=argv[optind];
+      tempError=malloc(strlen(tempChar) + strlen(invalidOpt) +1);
+      if(!tempError) {
+        set_error("Out of memory.\n");
+        goto parcleanup;
+      }
       strcpy(tempError, invalidOpt);
       strcat(tempError, tempChar);
       set_error(tempError);
@@ -429,8 +495,10 @@ int original_main(int argc, char * const *argv) {
     width = widthbak;  prefix = prefixbak;  suffix = suffixbak;
     hang = hangbak;  last = lastbak;  min = minbak;                //init all the values before setting default
     setdefaults((const char * const *) inlines, &width, &prefix, &suffix, &hang, &last, &min);
-    if (width <= prefix+suffix)
+    if (width <= prefix+suffix) {
+      set_error("width cannot be <= prefix+suffix\n");
      goto parcleanup;
+    }
     outlines = reformat((const char * const *) inlines, width, prefix, suffix, hang, last, min);
     if (is_error()) goto parcleanup;
     freelines(inlines);
