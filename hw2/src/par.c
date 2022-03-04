@@ -516,7 +516,7 @@ parcleanup:
   if (outlines) freelines(outlines);
 
   if (is_error()) {
-    report_error(stdout);
+    report_error(stderr);
     clear_error();
     exit(EXIT_FAILURE);
   }
