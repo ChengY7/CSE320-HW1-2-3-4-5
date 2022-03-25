@@ -162,9 +162,24 @@ void sf_free(void *ptr) {
             bp->header=((this_block_size|header_4bits)|IN_QUICK_LIST)^MAGIC;        
         }
     }
-
-    sf_show_heap();
-    
+    else {
+        int prev_alloc=(((bp->header)^MAGIC))&PREV_BLOCK_ALLOCATED;
+        sf_block* nbp=(sf_block*)(((void*)bp)+this_block_size);
+        if(prev_alloc) {
+            bp->header=(this_block_size|prev_alloc)^MAGIC;
+            nbp->prev_footer=(this_block_size|prev_alloc)^MAGIC;
+        }
+        else {
+            bp->header=this_block_size^MAGIC;
+            nbp->prev_footer=this_block_size^MAGIC;
+        }
+        nbp->header=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+        int next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
+        sf_block* nnbp = (sf_block*)(((void*)nbp)+next_block_size);
+        nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+        place_into_list(bp, getIndex(this_block_size));
+        coalesce(bp);
+    }
 }
 
 void *sf_realloc(void *ptr, sf_size_t rsize) {
