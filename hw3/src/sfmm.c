@@ -11,6 +11,8 @@
 
 #define PACK(size, alloc) ((size) | (alloc))
 #define M 32
+void place_into_list(sf_block* bp, int index);
+void remove_from_list(sf_block* bp);
 void coalesce(sf_block* bp);
 int getIndex(int free_block_size);
 void place_into_freelists(sf_block* bp, sf_size_t size, int calculated_size);
@@ -71,11 +73,15 @@ void *sf_malloc(sf_size_t size) {
         ((sf_block*)bp)->body.links.prev=&sf_free_list_heads[5];
         sf_free_list_heads[5].body.links.next=((sf_block*)bp);
         ((sf_block*)bp)->body.links.next->body.links.prev=((sf_block*)bp);
+        void* new_page = bp;
         //Footer of the added block
         bp=sf_mem_end()-16;
         ((sf_block *)bp)->prev_footer=(PACK(PAGE_SZ, prev_alloc))^MAGIC;
         //Epilogue
         ((sf_block *)bp)->header=PACK(0,THIS_BLOCK_ALLOCATED) ^ MAGIC;
+        coalesce((sf_block*)new_page);
+        //find space
+        bp = (void *)find_free_list_spot(calculated_size);
     }
     place_into_freelists((sf_block*)bp, size, calculated_size);
     sf_show_heap();
@@ -105,7 +111,88 @@ double sf_peak_utilization() {
     // TO BE IMPLEMENTED
     abort();
 }
+void place_into_list(sf_block* bp, int index) {
+    bp->body.links.next=sf_free_list_heads[index].body.links.next;
+    bp->body.links.prev=&sf_free_list_heads[index];
+    sf_free_list_heads[index].body.links.next=bp;
+    bp->body.links.next->body.links.prev=bp;
+}
+void remove_from_list(sf_block* bp) {
+    bp->body.links.prev->body.links.next=bp->body.links.next;
+    bp->body.links.next->body.links.prev=bp->body.links.prev;
+    bp->body.links.next=0x0;
+    bp->body.links.prev=0x0;
+}
 void coalesce(sf_block* bp) {
+    int this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
+    int prev_alloc=((bp->prev_footer)^MAGIC)&THIS_BLOCK_ALLOCATED;
+    int prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
+    sf_block* nbp=(sf_block*)(((void*)bp)+this_block_size);
+    sf_block* pbp=(sf_block*)(((void*)bp)-prev_block_size);
+    int next_alloc=((nbp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+    int next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
+    int header_4bits=0;
+    int new_block_size=0;
+    if(prev_alloc && next_alloc)
+        return;
+    else if(prev_alloc && !next_alloc) {
+        header_4bits=((bp->header)^MAGIC)|0xF;
+        new_block_size=this_block_size+next_block_size;
+        //remove this free block from free list
+        remove_from_list(bp);
+        //remove next free block from free list
+        remove_from_list(nbp);
+        //remove next free block prev_footer and header
+        nbp->prev_footer=0^MAGIC;
+        nbp->header=0^MAGIC;
+        //set block's header
+        bp->header=(PACK(new_block_size, header_4bits))^MAGIC;
+        void* new_next_block=((void*)bp)+new_block_size;
+        //set block's footer
+        ((sf_block*)new_next_block)->prev_footer=(PACK(new_block_size, header_4bits))^MAGIC;
+        place_into_list(bp, getIndex(new_block_size));
+        return;
+    }
+    else if(!prev_alloc && next_alloc) {
+        header_4bits=((pbp->header)^MAGIC)&0xF;
+        new_block_size=prev_block_size+this_block_size;
+        //remove previous free block from free list
+        remove_from_list(pbp);
+        //remove current free block from free list
+        remove_from_list(bp);
+        //remove this free block prev_footer and header
+        bp->prev_footer=0^MAGIC;
+        bp->header=4^MAGIC;
+        //set block's header
+        pbp->header=(PACK(new_block_size, header_4bits))^MAGIC;
+        //set block's footer
+        nbp->prev_footer=(PACK(new_block_size, header_4bits))^MAGIC;
+        place_into_list(pbp, getIndex(new_block_size));
+        return;
+    }
+    else if(!prev_alloc && !next_alloc) {
+        header_4bits=((pbp->header)^MAGIC)&0xF;
+        new_block_size=prev_block_size+this_block_size+next_block_size;
+        //remove previous free block from free list
+        remove_from_list(pbp);
+        //remove current free block from free list
+        remove_from_list(bp);
+        //remove next free block from free list
+        remove_from_list(nbp);
+        //remove this free block prev_footer and header
+        bp->prev_footer=0^MAGIC;
+        bp->header=0^MAGIC;
+        //remove next free block prev_footer and header
+        nbp->prev_footer=0^MAGIC;
+        nbp->header=0^MAGIC;
+        //set block's footer
+        pbp->header=(PACK(new_block_size, header_4bits))^MAGIC;
+        void* new_next_block=((void*)bp)+new_block_size;
+        //set block's footer
+        ((sf_block*)new_next_block)->prev_footer=(PACK(new_block_size, header_4bits))^MAGIC;
+        place_into_list(pbp, getIndex(new_block_size));
+        return;
+    }
     return;
 }
 int getIndex(int free_block_size) {
