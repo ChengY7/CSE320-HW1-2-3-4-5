@@ -14,11 +14,11 @@
 void place_into_list(sf_block* bp, int index);
 void remove_from_list(sf_block* bp);
 void coalesce(sf_block* bp);
-int getIndex(int free_block_size);
-void place_into_freelists(sf_block* bp, sf_size_t size, int calculated_size);
+int getIndex(uint64_t free_block_size);
+void place_into_freelists(sf_block* bp, sf_size_t size, sf_size_t calculated_size);
 int twoPower(int num);
-sf_block* find_free_list_spot(int calculated_size);
-int get_size(sf_size_t size);
+sf_block* find_free_list_spot(sf_size_t calculated_size);
+sf_size_t get_size(sf_size_t size);
 
 void heap() {
     sf_show_heap();
@@ -51,7 +51,7 @@ void *sf_malloc(sf_size_t size) {
         //Epilogue
         ((sf_block *)HeapPointer)->header=PACK(0,THIS_BLOCK_ALLOCATED) ^ MAGIC;
     }
-    int calculated_size=get_size(size);
+    sf_size_t calculated_size=get_size(size);
     if(calculated_size<=176) {             //If size is <=176 then we check the quick list (index=(size-32)/16)
         if(sf_quick_lists[(calculated_size-32)/16].length!=0) {  //if the quick list is not empty
             printf("wrok on it later");
@@ -84,7 +84,6 @@ void *sf_malloc(sf_size_t size) {
         bp = (void *)find_free_list_spot(calculated_size);
     }
     place_into_freelists((sf_block*)bp, size, calculated_size);
-    sf_show_heap();
     return bp+16;
     
     
@@ -93,8 +92,79 @@ void *sf_malloc(sf_size_t size) {
 }
 
 void sf_free(void *ptr) {
-    // TO BE IMPLEMENTED
-    abort();
+    ptr-=16;
+    if(ptr==NULL)
+        abort();
+    if(((uint64_t)ptr%16)!=0)
+        abort();
+    sf_block* bp = (sf_block*)ptr;
+    uint64_t this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
+    if(this_block_size<32)
+        abort();
+    if((this_block_size%16)!=0)
+        abort();
+    //ptr is prologue or before heap
+    if(ptr<=sf_mem_start())
+        abort();
+    //ptr footer is after the end of the last block in the heap
+    if((ptr+this_block_size)>sf_mem_end()-16)
+        abort();
+    int alloc = ((bp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+    if(!alloc)
+        abort();
+    int prev_alloc=((bp->header)^MAGIC)&PREV_BLOCK_ALLOCATED;
+    if(prev_alloc==0) {
+        int footer_prev_alloc=((bp->prev_footer)^MAGIC)&THIS_BLOCK_ALLOCATED;
+        if(footer_prev_alloc)
+            abort();
+        else{
+            uint64_t prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
+            sf_block* pbp=bp-prev_block_size;
+            int header_previous_alloc=((pbp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+            if(footer_prev_alloc!=header_previous_alloc)
+                abort();
+        }
+    }
+    if(this_block_size<=176) {
+        if(sf_quick_lists[(this_block_size-32)/16].length>=QUICK_LIST_MAX) { //flush
+            sf_block* tempbp;
+            for(int i=0; i<QUICK_LIST_MAX; i++) {
+                tempbp = sf_quick_lists[(this_block_size-32)/16].first;
+                int prev_alloc=(((tempbp->header)^MAGIC))&PREV_BLOCK_ALLOCATED;
+                sf_block* nbp=(sf_block*)(((void*)tempbp)+this_block_size);
+                if(prev_alloc) {
+                    tempbp->header=(this_block_size|prev_alloc)^MAGIC;
+                    nbp->prev_footer=(this_block_size|prev_alloc)^MAGIC;
+                }
+                else {
+                    tempbp->header=this_block_size^MAGIC;
+                    nbp->prev_footer=this_block_size^MAGIC;
+                }
+                nbp->header=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+                int next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
+                sf_block* nnbp = (sf_block*)(((void*)nbp)+next_block_size);
+                nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+                sf_quick_lists[(this_block_size-32)/16].first=sf_quick_lists[(this_block_size-32)/16].first->body.links.next;
+                place_into_list(tempbp, getIndex(this_block_size));
+                coalesce(tempbp);
+            }
+            bp->body.links.next=sf_quick_lists[(this_block_size-32)/16].first;
+            sf_quick_lists[(this_block_size-32)/16].first=bp;
+            sf_quick_lists[(this_block_size-32)/16].length++;
+            int header_4bits=((bp->header)^MAGIC)&0xF;
+            bp->header=((this_block_size|header_4bits)|IN_QUICK_LIST)^MAGIC; 
+        }
+        else { //no flush
+            bp->body.links.next=sf_quick_lists[(this_block_size-32)/16].first;
+            sf_quick_lists[(this_block_size-32)/16].first=bp;
+            sf_quick_lists[(this_block_size-32)/16].length++;
+            int header_4bits=((bp->header)^MAGIC)&0xF;
+            bp->header=((this_block_size|header_4bits)|IN_QUICK_LIST)^MAGIC;        
+        }
+    }
+
+    sf_show_heap();
+    
 }
 
 void *sf_realloc(void *ptr, sf_size_t rsize) {
@@ -124,19 +194,19 @@ void remove_from_list(sf_block* bp) {
     bp->body.links.prev=0x0;
 }
 void coalesce(sf_block* bp) {
-    int this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
-    int prev_alloc=((bp->prev_footer)^MAGIC)&THIS_BLOCK_ALLOCATED;
-    int prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
+    uint64_t this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
+    int prev_alloc=((bp->header)^MAGIC)&PREV_BLOCK_ALLOCATED;
+    uint64_t prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
     sf_block* nbp=(sf_block*)(((void*)bp)+this_block_size);
     sf_block* pbp=(sf_block*)(((void*)bp)-prev_block_size);
     int next_alloc=((nbp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
-    int next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
+    uint64_t next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
     int header_4bits=0;
-    int new_block_size=0;
+    uint64_t new_block_size=0;
     if(prev_alloc && next_alloc)
         return;
     else if(prev_alloc && !next_alloc) {
-        header_4bits=((bp->header)^MAGIC)|0xF;
+        header_4bits=((bp->header)^MAGIC)&0xF;
         new_block_size=this_block_size+next_block_size;
         //remove this free block from free list
         remove_from_list(bp);
@@ -195,7 +265,7 @@ void coalesce(sf_block* bp) {
     }
     return;
 }
-int getIndex(int free_block_size) {
+int getIndex(uint64_t free_block_size) {
     if(free_block_size==M) return 0;
     else if(M<free_block_size && free_block_size<=2*M) return 1;
     else if(2*M<free_block_size && free_block_size<=4*M) return 2;
@@ -208,8 +278,8 @@ int getIndex(int free_block_size) {
     else if(free_block_size>256*M) return 9;
     return -1;
 }
-void place_into_freelists(sf_block* bp, sf_size_t size, int calculated_size) {
-    int free_block_size=((bp->header)^MAGIC) - (((bp->header)^MAGIC)&0xf); //get the size of the free block
+void place_into_freelists(sf_block* bp, sf_size_t size, sf_size_t calculated_size) {
+    uint64_t free_block_size=((bp->header)^MAGIC) - (((bp->header)^MAGIC)&0xf); //get the size of the free block
     int prev_alloc = ((bp->header)^MAGIC) & PREV_BLOCK_ALLOCATED; //get the prev allocated bit of the header
     if(free_block_size-calculated_size<32) { //if free block size minus calculated block size creates splinter no need to split
         //change header to allocated
@@ -229,7 +299,7 @@ void place_into_freelists(sf_block* bp, sf_size_t size, int calculated_size) {
         return;
     }
     else {                                      //need to split     
-        int new_block_size = free_block_size-calculated_size;
+        uint64_t new_block_size = free_block_size-calculated_size;
         if(prev_alloc)
             bp->header=(((((uint64_t)size<<32)|calculated_size)|THIS_BLOCK_ALLOCATED)|PREV_BLOCK_ALLOCATED)^MAGIC;
         else
@@ -258,12 +328,12 @@ void place_into_freelists(sf_block* bp, sf_size_t size, int calculated_size) {
         return;
     } 
 }
-sf_block* find_free_list_spot(int calculated_size) {
+sf_block* find_free_list_spot(sf_size_t calculated_size) {
     for(int i=0; i<NUM_FREE_LISTS; i++) {
         if(i==9 && sf_free_list_heads[i].body.links.next!=&sf_free_list_heads[i]) {             //if i==9 and it has space then jump
             sf_block* bp = sf_free_list_heads[i].body.links.next;                                //get the first free block of the free list
             while(bp!=&sf_free_list_heads[i]) {
-                int free_block_size = ((bp->header)^MAGIC) - (((bp->header)^MAGIC) & 0xf);                         //get the free block size
+                uint64_t free_block_size = ((bp->header)^MAGIC) - (((bp->header)^MAGIC) & 0xf);                         //get the free block size
                 if(calculated_size<=free_block_size)                                             //if there enough space return pointer
                     return bp;
                 bp=bp->body.links.next;
@@ -273,7 +343,7 @@ sf_block* find_free_list_spot(int calculated_size) {
         if(calculated_size<=(twoPower(i)*M) && sf_free_list_heads[i].body.links.next!=&sf_free_list_heads[i]) {
             sf_block* bp = sf_free_list_heads[i].body.links.next;                                //get the first free block of the free list
             while(bp!=&sf_free_list_heads[i]) {
-                int free_block_size = ((bp->header)^MAGIC) - (((bp->header)^MAGIC) & 0xf);                         //get the free block size
+                uint64_t free_block_size = ((bp->header)^MAGIC) - (((bp->header)^MAGIC) & 0xf);                         //get the free block size
                 if(calculated_size<=free_block_size)                                             //if there enough space return pointer
                     return bp;
                 bp=bp->body.links.next;
@@ -286,7 +356,7 @@ sf_block* find_free_list_spot(int calculated_size) {
     return NULL;
 }
 
-int get_size(sf_size_t size) {
+sf_size_t get_size(sf_size_t size) {
     if(size<=24)
         return 32;
     size+=8;
