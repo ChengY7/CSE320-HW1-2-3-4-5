@@ -129,7 +129,7 @@ void sf_free(void *ptr) {
             abort();
         else{
             uint64_t prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
-            sf_block* pbp=bp-prev_block_size;
+            sf_block* pbp=((void*)bp)-prev_block_size;
             int header_previous_alloc=((pbp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
             if(footer_prev_alloc!=header_previous_alloc)
                 abort();
@@ -155,6 +155,7 @@ void sf_free(void *ptr) {
                 sf_block* nnbp = (sf_block*)(((void*)nbp)+next_block_size);
                 nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
                 sf_quick_lists[(this_block_size-32)/16].first=sf_quick_lists[(this_block_size-32)/16].first->body.links.next;
+                tempbp->body.links.next=0x0;
                 place_into_list(tempbp, getIndex(this_block_size));
                 coalesce(tempbp);
             }
@@ -236,7 +237,7 @@ void *sf_realloc(void *ptr, sf_size_t rsize) {
         }
         else{
             uint64_t prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
-            sf_block* pbp=bp-prev_block_size;
+            sf_block* pbp=((void*)bp)-prev_block_size;
             int header_previous_alloc=((pbp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
             if(footer_prev_alloc!=header_previous_alloc){
                 sf_errno=EINVAL;
@@ -371,7 +372,7 @@ void coalesce(sf_block* bp) {
         nbp->header=0^MAGIC;
         //set block's footer
         pbp->header=(PACK(new_block_size, header_4bits))^MAGIC;
-        void* new_next_block=((void*)bp)+new_block_size;
+        void* new_next_block=((void*)pbp)+new_block_size;
         //set block's footer
         ((sf_block*)new_next_block)->prev_footer=(PACK(new_block_size, header_4bits))^MAGIC;
         place_into_list(pbp, getIndex(new_block_size));
