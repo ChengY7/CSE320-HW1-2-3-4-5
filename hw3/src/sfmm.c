@@ -85,10 +85,6 @@ void *sf_malloc(sf_size_t size) {
     }
     place_into_freelists((sf_block*)bp, size, calculated_size);
     return bp+16;
-    
-    
-    //not_enough_space:
-    //mem grow
 }
 
 void sf_free(void *ptr) {
@@ -183,8 +179,97 @@ void sf_free(void *ptr) {
 }
 
 void *sf_realloc(void *ptr, sf_size_t rsize) {
-    // TO BE IMPLEMENTED
-    abort();
+    ptr-=16;
+    if(ptr==NULL){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    if(((uint64_t)ptr%16)!=0){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    sf_block* bp = (sf_block*)ptr;
+    uint64_t this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
+    if(this_block_size<32){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    if((this_block_size%16)!=0){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    //ptr is prologue or before heap
+    if(ptr<=sf_mem_start()){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    //ptr footer is after the end of the last block in the heap
+    if((ptr+this_block_size)>sf_mem_end()-16){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    int alloc = ((bp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+    if(!alloc){
+        sf_errno=EINVAL;
+        return NULL;
+    }
+    int prev_alloc=((bp->header)^MAGIC)&PREV_BLOCK_ALLOCATED;
+    if(prev_alloc==0) {
+        int footer_prev_alloc=((bp->prev_footer)^MAGIC)&THIS_BLOCK_ALLOCATED;
+        if(footer_prev_alloc){
+            sf_errno=EINVAL;
+            return NULL;
+        }
+        else{
+            uint64_t prev_block_size=(((bp->prev_footer)^MAGIC)&0xFFFFFFFF)-(((bp->prev_footer)^MAGIC)&0xF);
+            sf_block* pbp=bp-prev_block_size;
+            int header_previous_alloc=((pbp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+            if(footer_prev_alloc!=header_previous_alloc){
+                sf_errno=EINVAL;
+                return NULL;
+            }
+        }
+    }
+    int calculated_size=get_size(rsize);
+    uint64_t payload = ((bp->header)^MAGIC)>>32;
+    if(rsize<=0) {
+        sf_free(ptr+16);
+        return NULL;
+    }
+    else if(calculated_size>this_block_size) {
+        void* newPtr = sf_malloc(rsize);
+        if(newPtr==NULL)
+            return NULL;
+        memcpy(newPtr+16, ptr, payload);
+        sf_free(ptr+16);
+        return newPtr;
+    }
+    else{
+        int header_4bits=((bp->header)^MAGIC)&0xF;
+        if(this_block_size-calculated_size<32) {
+            bp->header=(((((uint64_t)rsize)<<32)|this_block_size)|header_4bits)^MAGIC;
+            sf_block* nbp=(sf_block*)(((void*)bp)+this_block_size);
+            nbp->prev_footer=(((((uint64_t)rsize)<<32)|this_block_size)|header_4bits)^MAGIC;
+            return ((void*)bp)+16;
+        }
+        else{
+            int new_free_block_size=this_block_size-calculated_size;
+            bp->header=(((((uint64_t)rsize)<<32)|calculated_size)|header_4bits)^MAGIC;
+            sf_block* nnbp=(sf_block*)(((void*)bp)+this_block_size);
+            sf_block* nbp=(sf_block*)(((void*)bp)+calculated_size);
+            nbp->prev_footer=(((((uint64_t)rsize)<<32)|calculated_size)|header_4bits)^MAGIC;
+            nbp->header=(PACK(new_free_block_size, PREV_BLOCK_ALLOCATED))^MAGIC;
+            nnbp->prev_footer=(PACK(new_free_block_size, PREV_BLOCK_ALLOCATED))^MAGIC;
+            nnbp->header=(((nnbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+            uint64_t next_next_block_size=(((nnbp->header)^MAGIC)&0xFFFFFFFF)-(((nnbp->header)^MAGIC)&0xF);
+            sf_block* nnnbp=(sf_block*)(((void*)nnbp)+next_next_block_size);
+            nnnbp->prev_footer=(((nnnbp->prev_footer)^MAGIC)&0xFFFFFFFD)^MAGIC;
+            place_into_list(nbp, getIndex(new_free_block_size));
+            coalesce((sf_block*)nbp);
+            return ((void*)bp)+16;
+        }
+    }
+    return NULL;
 }
 
 double sf_internal_fragmentation() {
@@ -344,7 +429,7 @@ void place_into_freelists(sf_block* bp, sf_size_t size, sf_size_t calculated_siz
     } 
 }
 sf_block* find_free_list_spot(sf_size_t calculated_size) {
-    for(int i=0; i<NUM_FREE_LISTS; i++) {
+    for(int i=getIndex(calculated_size); i<NUM_FREE_LISTS; i++) {
         if(i==9 && sf_free_list_heads[i].body.links.next!=&sf_free_list_heads[i]) {             //if i==9 and it has space then jump
             sf_block* bp = sf_free_list_heads[i].body.links.next;                                //get the first free block of the free list
             while(bp!=&sf_free_list_heads[i]) {
