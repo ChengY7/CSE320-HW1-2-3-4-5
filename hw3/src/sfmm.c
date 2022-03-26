@@ -54,7 +54,21 @@ void *sf_malloc(sf_size_t size) {
     sf_size_t calculated_size=get_size(size);
     if(calculated_size<=176) {             //If size is <=176 then we check the quick list (index=(size-32)/16)
         if(sf_quick_lists[(calculated_size-32)/16].length!=0) {  //if the quick list is not empty
-            printf("wrok on it later");
+            sf_block* tempbp=sf_quick_lists[(calculated_size-32)/16].first;
+            sf_block* nbp=(sf_block*)(((void*)tempbp)+calculated_size);
+            int prev_alloc=(((tempbp->header)^MAGIC))&PREV_BLOCK_ALLOCATED;
+            if(prev_alloc) {
+                tempbp->header=((((((uint64_t)size)<<32)|calculated_size)|THIS_BLOCK_ALLOCATED)|prev_alloc)^MAGIC;
+                nbp->prev_footer=((((((uint64_t)size)<<32)|calculated_size)|THIS_BLOCK_ALLOCATED)|prev_alloc)^MAGIC;
+            }
+            else {
+                tempbp->header=(((((uint64_t)size)<<32)|calculated_size)|THIS_BLOCK_ALLOCATED)^MAGIC;
+                nbp->prev_footer=(((((uint64_t)size)<<32)|calculated_size)|THIS_BLOCK_ALLOCATED)^MAGIC;
+            }
+            sf_quick_lists[(calculated_size-32)/16].first=tempbp->body.links.next;
+            tempbp->body.links.next=0x0;
+            sf_quick_lists[(calculated_size-32)/16].length--;
+            return ((void*)tempbp)+16;    
         }
     }
     void *bp = (void *)find_free_list_spot(calculated_size);     //find a free block in the free list
