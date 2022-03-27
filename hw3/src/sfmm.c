@@ -11,6 +11,8 @@
 
 #define PACK(size, alloc) ((size) | (alloc))
 #define M 32
+int peak_payload=0;
+void set_peak_payload();
 void place_into_list(sf_block* bp, int index);
 void remove_from_list(sf_block* bp);
 void coalesce(sf_block* bp);
@@ -20,9 +22,6 @@ int twoPower(int num);
 sf_block* find_free_list_spot(sf_size_t calculated_size);
 sf_size_t get_size(sf_size_t size);
 
-void heap() {
-    sf_show_heap();
-}
 void *sf_malloc(sf_size_t size) {
     if(size<=0)
         return NULL;
@@ -68,6 +67,7 @@ void *sf_malloc(sf_size_t size) {
             sf_quick_lists[(calculated_size-32)/16].first=tempbp->body.links.next;
             tempbp->body.links.next=0x0;
             sf_quick_lists[(calculated_size-32)/16].length--;
+            set_peak_payload();
             return ((void*)tempbp)+16;    
         }
     }
@@ -98,6 +98,7 @@ void *sf_malloc(sf_size_t size) {
         bp = (void *)find_free_list_spot(calculated_size);
     }
     place_into_freelists((sf_block*)bp, size, calculated_size);
+    set_peak_payload();
     return bp+16;
 }
 
@@ -150,10 +151,10 @@ void sf_free(void *ptr) {
                     tempbp->header=this_block_size^MAGIC;
                     nbp->prev_footer=this_block_size^MAGIC;
                 }
-                nbp->header=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+                nbp->header=(((nbp->header)^MAGIC)&0xFFFFFFFFFFFFFFFD)^MAGIC;
                 int next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
                 sf_block* nnbp = (sf_block*)(((void*)nbp)+next_block_size);
-                nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+                nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFFFFFFFFFD)^MAGIC;
                 sf_quick_lists[(this_block_size-32)/16].first=sf_quick_lists[(this_block_size-32)/16].first->body.links.next;
                 tempbp->body.links.next=0x0;
                 place_into_list(tempbp, getIndex(this_block_size));
@@ -184,10 +185,10 @@ void sf_free(void *ptr) {
             bp->header=this_block_size^MAGIC;
             nbp->prev_footer=this_block_size^MAGIC;
         }
-        nbp->header=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+        nbp->header=(((nbp->header)^MAGIC)&0xFFFFFFFFFFFFFFFD)^MAGIC;
         int next_block_size=(((nbp->header)^MAGIC)&0xFFFFFFFF)-(((nbp->header)^MAGIC)&0xF);
         sf_block* nnbp = (sf_block*)(((void*)nbp)+next_block_size);
-        nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+        nnbp->prev_footer=(((nbp->header)^MAGIC)&0xFFFFFFFFFFFFFFFD)^MAGIC;
         place_into_list(bp, getIndex(this_block_size));
         coalesce(bp);
     }
@@ -257,6 +258,7 @@ void *sf_realloc(void *ptr, sf_size_t rsize) {
             return NULL;
         memcpy(newPtr+16, ptr, payload);
         sf_free(ptr+16);
+        set_peak_payload();
         return newPtr;
     }
     else{
@@ -265,6 +267,7 @@ void *sf_realloc(void *ptr, sf_size_t rsize) {
             bp->header=(((((uint64_t)rsize)<<32)|this_block_size)|header_4bits)^MAGIC;
             sf_block* nbp=(sf_block*)(((void*)bp)+this_block_size);
             nbp->prev_footer=(((((uint64_t)rsize)<<32)|this_block_size)|header_4bits)^MAGIC;
+            set_peak_payload();
             return ((void*)bp)+16;
         }
         else{
@@ -275,12 +278,13 @@ void *sf_realloc(void *ptr, sf_size_t rsize) {
             nbp->prev_footer=(((((uint64_t)rsize)<<32)|calculated_size)|header_4bits)^MAGIC;
             nbp->header=(PACK(new_free_block_size, PREV_BLOCK_ALLOCATED))^MAGIC;
             nnbp->prev_footer=(PACK(new_free_block_size, PREV_BLOCK_ALLOCATED))^MAGIC;
-            nnbp->header=(((nnbp->header)^MAGIC)&0xFFFFFFFD)^MAGIC;
+            nnbp->header=(((nnbp->header)^MAGIC)&0xFFFFFFFFFFFFFFFD)^MAGIC;
             uint64_t next_next_block_size=(((nnbp->header)^MAGIC)&0xFFFFFFFF)-(((nnbp->header)^MAGIC)&0xF);
             sf_block* nnnbp=(sf_block*)(((void*)nnbp)+next_next_block_size);
-            nnnbp->prev_footer=(((nnnbp->prev_footer)^MAGIC)&0xFFFFFFFD)^MAGIC;
+            nnnbp->prev_footer=(((nnnbp->prev_footer)^MAGIC)&0xFFFFFFFFFFFFFFFD)^MAGIC;
             place_into_list(nbp, getIndex(new_free_block_size));
             coalesce((sf_block*)nbp);
+            set_peak_payload();
             return ((void*)bp)+16;
         }
     }
@@ -288,13 +292,31 @@ void *sf_realloc(void *ptr, sf_size_t rsize) {
 }
 
 double sf_internal_fragmentation() {
-    // TO BE IMPLEMENTED
-    abort();
+    if(sf_mem_start()==sf_mem_end())
+        return 0.0;
+    sf_block* bp = sf_mem_start()+32;
+    double payload=0;
+    double size=0;
+    while(bp!=sf_mem_end()-16) {
+        int alloc = ((bp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+        int quickList = ((bp->header)^MAGIC)&IN_QUICK_LIST;
+        uint64_t this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
+        if(alloc && !quickList) {
+            payload+=((bp->header)^MAGIC)>>32;
+            size+=this_block_size;
+        }
+        bp=((void*)bp)+this_block_size;
+    }
+    if(payload==0 && size==0)
+        return 0.0;
+    return payload/size;
 }
 
 double sf_peak_utilization() {
-    // TO BE IMPLEMENTED
-    abort();
+    if(sf_mem_start()==sf_mem_end())
+        return 0.0;
+    double heap_size=(uint64_t)sf_mem_end()-(uint64_t)sf_mem_start();
+    return (double)peak_payload/heap_size;
 }
 void place_into_list(sf_block* bp, int index) {
     bp->body.links.next=sf_free_list_heads[index].body.links.next;
@@ -486,4 +508,18 @@ int twoPower(int num) {
     for(int i=0; i<num; i++)
         ans=ans*2;
     return ans;
+}
+void set_peak_payload() {
+    sf_block* bp = sf_mem_start()+32;
+    int current_payload=0;
+    while(bp!=sf_mem_end()-16) {
+        int alloc = ((bp->header)^MAGIC)&THIS_BLOCK_ALLOCATED;
+        int quickList = ((bp->header)^MAGIC)&IN_QUICK_LIST;
+        uint64_t this_block_size=(((bp->header)^MAGIC)&0xFFFFFFFF)-(((bp->header)^MAGIC)&0xF);
+        if(alloc && !quickList) 
+            current_payload+=((bp->header)^MAGIC)>>32;
+        bp=((void*)bp)+this_block_size;
+    }
+    if(current_payload>peak_payload)
+        peak_payload=current_payload;
 }
