@@ -70,9 +70,9 @@ Test(sfmm_basecode_suite, malloc_an_int, .timeout = TEST_TIMEOUT) {
 
 	cr_assert(*x == 4, "sf_malloc failed to give proper space for an int!");
 	sf_block *bp = (sf_block *)((char *)x - 16);
-	cr_assert((bp->header >> 32) & 0xffffffff,
+	cr_assert((((bp->header ^ MAGIC) >> 32) & 0xffffffff) == sz,
 		  "Malloc'ed block payload size (%ld) not what was expected (%ld)!",
-		  (bp->header >> 32) & 0xffffffff, sz);
+		  (((bp->header ^ MAGIC) >> 32) & 0xffffffff), sz);
 
 	assert_quick_list_block_count(0, 0);
 	assert_free_block_count(0, 1);
@@ -258,3 +258,80 @@ Test(sfmm_basecode_suite, realloc_smaller_block_free_block, .timeout = TEST_TIME
 
 //Test(sfmm_student_suite, student_test_1, .timeout = TEST_TIMEOUT) {
 //}
+Test(sfmm_student_suite, student_test_1, .timeout = TEST_TIMEOUT) {
+	void* a = sf_malloc(24);
+	sf_free(a);
+	void* b = sf_malloc(40);
+	sf_free(b);
+	void* c = sf_malloc(56);
+	sf_free(c);
+	void* d = sf_malloc(72);
+	sf_free(d);
+	void* e = sf_malloc(88);
+	sf_free(e);
+	void* f = sf_malloc(104);
+	sf_free(f);
+	void* g = sf_malloc(120);
+	sf_free(g);
+	void* h = sf_malloc(136);
+	sf_free(h);
+	void* i = sf_malloc(152);
+	sf_free(i);
+	void* j = sf_malloc(168);
+	sf_free(j);
+	assert_quick_list_block_count(32, 1);
+	assert_quick_list_block_count(48, 1);
+	assert_quick_list_block_count(64, 1);
+	assert_quick_list_block_count(80, 1);
+	assert_quick_list_block_count(96, 1);
+	assert_quick_list_block_count(112, 1);
+	assert_quick_list_block_count(128, 1);
+	assert_quick_list_block_count(144, 1);
+	assert_quick_list_block_count(160, 1);
+	assert_quick_list_block_count(176, 1);
+	assert_free_block_count(0, 1);
+}
+Test(sfmm_student_suite, student_test_2, .timeout = TEST_TIMEOUT) {
+	void* a = sf_malloc(1);
+	void* b = sf_malloc(1);
+	void* c = sf_malloc(1);
+	void* d = sf_malloc(1);
+	void* e = sf_malloc(1);
+	void* f = sf_malloc(1);
+	sf_free(a);
+	sf_free(b);
+	sf_free(c);
+	sf_free(d);
+	sf_free(e);
+	sf_free(f);
+	
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+	assert_free_block_count(160, 1);
+	assert_free_block_count(784, 1);
+	assert_free_block_count(0, 2);
+	assert_quick_list_block_count(0, 1);
+}
+Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT) {
+	void* x = sf_malloc(32);
+	x=sf_realloc((x+8), 50);
+	cr_assert_null(x, "x should be NULL");
+	cr_assert(sf_errno=EINVAL, "Errno should be EINVAL");
+}
+Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT) {
+	int* x = sf_malloc(1016);
+	*x=4;
+ 	double internal_frag=sf_internal_fragmentation();
+ 	cr_assert(internal_frag=0.512, "Internal fragmentation is wrong");
+}
+Test(sfmm_basecode_suite, student_test_5, .timeout = TEST_TIMEOUT) {
+	void* a = sf_malloc(248);
+	void* b = sf_malloc(248);
+	sf_free(a);
+	sf_free(b);
+	void* c = sf_malloc(24);
+	sf_free(c);
+	double peak_utilization=sf_peak_utilization();
+	cr_assert(peak_utilization=0.5, "Peak utilization is wrong");
+}
+
+
