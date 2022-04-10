@@ -3,6 +3,10 @@
 
 #include "mush.h"
 #include "debug.h"
+#include "program.h"
+static int counter=-1;
+static struct p_storage sentinal;
+
 
 /*
  * This is the "program store" module for Mush.
@@ -25,8 +29,20 @@
  * @return  0 if successful, -1 if any error occurred.
  */
 int prog_list(FILE *out) {
-    // TO BE IMPLEMENTED
-    abort();
+    struct p_storage *pointer = sentinal.next;
+    if(sentinal.next==NULL || sentinal.next==&sentinal) {
+        fprintf(out, "-->\n");
+        return 0;
+    }
+    while(pointer!=&sentinal) {
+        if(pointer->statement->lineno==counter+1)
+            fprintf(out, "-->\n");
+        show_stmt(out, pointer->statement);
+        if(counter==-1 && pointer->next==&sentinal)
+            fprintf(out, "-->\n");
+        pointer=pointer->next;
+    }
+    return 0;
 }
 
 /**
@@ -47,8 +63,48 @@ int prog_list(FILE *out) {
  * @return  0 if successful, -1 if any error occurred.
  */
 int prog_insert(STMT *stmt) {
-    // TO BE IMPLEMENTED
-    abort();
+    if (sentinal.next==NULL || sentinal.prev==NULL || sentinal.next==&sentinal) {
+        sentinal.statement=NULL;
+        struct p_storage *newNode = (struct p_storage*)malloc(sizeof(struct p_storage));
+        newNode->statement=stmt;
+        sentinal.next=newNode;
+        sentinal.prev=newNode;
+        newNode->next=&sentinal;
+        newNode->prev=&sentinal;
+        return 0;
+    }
+    struct p_storage *pointer = sentinal.next;
+    while (pointer!=&sentinal) {
+        if(pointer->next==&sentinal && stmt->lineno>pointer->statement->lineno) {
+            struct p_storage *newNode = (struct p_storage*)malloc(sizeof(struct p_storage));
+            newNode->statement=stmt;
+            newNode->next=&sentinal;
+            newNode->prev=pointer;
+            sentinal.prev=newNode;
+            pointer->next=newNode;
+            return 0;
+        }
+        if (stmt->lineno==pointer->statement->lineno) {
+            free_stmt(pointer->statement);
+            pointer->statement = stmt;
+            return 0;
+        }
+        else if(stmt->lineno>pointer->statement->lineno){
+            pointer=pointer->next;
+            continue;
+        }
+        else if(stmt->lineno<pointer->statement->lineno) {
+            struct p_storage *newNode = (struct p_storage*)malloc(sizeof(struct p_storage));
+            newNode->statement=stmt;
+            newNode->next=pointer;
+            newNode->prev=pointer->prev;
+            pointer->prev=newNode;
+            newNode->prev->next=newNode;
+            return 0;
+        }
+    }
+    return -1;
+    printf("%d\n", counter);
 }
 
 /**
@@ -69,8 +125,35 @@ int prog_insert(STMT *stmt) {
  * @param max  Upper end of the range of line numbers to be deleted.
  */
 int prog_delete(int min, int max) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(min>max)
+        return 0;
+    if(sentinal.next==NULL || sentinal.next==&sentinal)
+        return 0;
+    struct p_storage *pointer = sentinal.next;
+    while (pointer!=&sentinal) {
+        if(pointer->statement->lineno>=min && pointer->statement->lineno<=max) {
+            if((pointer->statement->lineno)==counter+1) {
+                if(pointer->next==&sentinal)
+                    counter=-1;
+                else 
+                    counter=pointer->next->statement->lineno-1;    
+            }
+            struct p_storage *tp = pointer->next;
+            pointer->prev->next=pointer->next;
+            pointer->next->prev=pointer->prev;
+            pointer->next=NULL;
+            pointer->prev=NULL;
+            free_stmt(pointer->statement);
+            free(pointer);
+            pointer=tp;
+            continue;
+        }
+        else {
+            pointer=pointer->next;
+            continue;
+        }
+    }
+    return 0;
 }
 
 /**
@@ -79,8 +162,10 @@ int prog_delete(int min, int max) {
  * before the first statement in the program.
  */
 void prog_reset(void) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(sentinal.next==NULL || sentinal.next==&sentinal)
+        counter=-1;
+    counter=(sentinal.next->statement->lineno)-1;
+    
 }
 
 /**
@@ -95,8 +180,16 @@ void prog_reset(void) {
  * counter position, if any, otherwise NULL.
  */
 STMT *prog_fetch(void) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(counter==-1)
+        return NULL;
+    struct p_storage *pointer = sentinal.next;
+    while (pointer!=&sentinal) {
+        if((pointer->statement->lineno)==counter+1)
+            return pointer->statement;
+        else   
+            pointer=pointer->next;
+    }
+    return NULL;
 }
 
 /**
@@ -111,8 +204,22 @@ STMT *prog_fetch(void) {
  * position, if any, otherwise NULL.
  */
 STMT *prog_next() {
-    // TO BE IMPLEMENTED
-    abort();
+    if(counter==-1)
+        return NULL;
+    struct p_storage *pointer = sentinal.next;
+    while (pointer!=&sentinal) {
+        if((pointer->statement->lineno)==counter+1) {
+            if(pointer->next==&sentinal)  {
+                counter=-1;
+                return NULL;
+            }
+            counter=(pointer->next->statement->lineno-1);
+            return pointer->next->statement;
+        }
+        else   
+            pointer=pointer->next;
+    }
+    return NULL;
 }
 
 /**
@@ -131,6 +238,18 @@ STMT *prog_next() {
  * statement exists, otherwise NULL.
  */
 STMT *prog_goto(int lineno) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(sentinal.next==NULL || sentinal.next==&sentinal)
+        return NULL;
+    struct p_storage *pointer = sentinal.next;
+    while (pointer!=&sentinal) {
+        if(pointer->statement->lineno==lineno) {
+            counter=pointer->statement->lineno-1;
+            return pointer->statement;
+        }
+        else {
+            pointer=pointer->next;
+            continue;
+        }
+    }
+    return NULL;
 }
