@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "mush.h"
+
 #include "debug.h"
 #include "program.h"
 static int counter=-1;

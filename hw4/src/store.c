@@ -1,7 +1,36 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include "program.h"
+static struct d_storage store_sentinal;
+int digit_len(long num) {
+    if(num==0)
+        return 1;
+    int i=0;
+    while(num!=0) {
+        num=num/10;
+        i++;
+    }
+    return i;
+}
+int is_num(char *str) {
+    while(*str!='\0') {
+        if(*str<48 || *str>57) {
+            return 0;
+        }
+        str++;
+    }
+    return 1;
+}
+long strToNum(char *str) {
+    long i=0;
+    while(*str!='\0') {
+        i=i*10;
+        i=i+*str-48;
+        str++;
+    }
+    return i;
+}
 /*
  * This is the "data store" module for Mush.
  * It maintains a mapping from variable names to values.
@@ -29,8 +58,18 @@
  * otherwise NULL.
  */
 char *store_get_string(char *var) {
-    // TO BE IMPLEMENTED
-    abort();
+    struct d_storage *pointer = store_sentinal.next;
+    while(pointer!=&store_sentinal) {
+        if(strcmp(pointer->data->var, var)==0) {
+            if(pointer->data->val==NULL)
+                return NULL;
+            else 
+                return pointer->data->val;
+        }
+        else 
+            pointer=pointer->next;
+    }
+    return NULL;
 }
 
 /**
@@ -47,8 +86,20 @@ char *store_get_string(char *var) {
  * otherwise 0 is returned.
  */
 int store_get_int(char *var, long *valp) {
-    // TO BE IMPLEMENTED
-    abort();
+    struct d_storage *pointer = store_sentinal.next;
+    while(pointer!=&store_sentinal) {
+        if(strcmp(pointer->data->var, var)==0) {
+            if(pointer->data->val==NULL)
+                return -1;
+            if(is_num(pointer->data->val)==0)
+                return -1;
+            *valp=strToNum(pointer->data->val);
+                return 0;
+        }
+        else 
+            pointer=pointer->next;
+    }
+    return -1;
 }
 
 /**
@@ -67,8 +118,49 @@ int store_get_int(char *var, long *valp) {
  * un-set.
  */
 int store_set_string(char *var, char *val) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(store_sentinal.next==NULL || store_sentinal.prev==NULL) {
+        store_sentinal.next=&store_sentinal;
+        store_sentinal.prev=&store_sentinal;
+    }
+    struct d_storage *pointer = store_sentinal.next;
+    while(pointer!=&store_sentinal) {
+        if(strcmp(pointer->data->var, var)==0) {
+            if(val==NULL) {
+                free(pointer->data->val);
+                pointer->data->val=NULL;
+                return 0;
+            }
+            if(pointer->data->val!=NULL) {
+                free(pointer->data->val);
+            }
+            char *newVal = (char*) malloc(strlen(val));
+            strcpy(newVal, val);
+            pointer->data->val=newVal;
+            return 0;
+        }
+        else
+            pointer=pointer->next;
+    }
+    char *newVar = (char*) malloc(strlen(var));
+    char *newVal;
+    if(val!=NULL) {
+        newVal = (char*) malloc(strlen(val));
+        strcpy(newVal, val);
+    }
+    strcpy(newVar, var);
+    struct d_storage *newNode = malloc(sizeof(struct d_storage));
+    struct data *dataPointer = malloc(sizeof(struct data));
+    dataPointer->var=newVar;
+    if(val!=NULL)
+        dataPointer->val=newVal;
+    else    
+        dataPointer->val=NULL;
+    newNode->data=dataPointer;
+    store_sentinal.prev->next=newNode;
+    newNode->prev=store_sentinal.prev;
+    store_sentinal.prev=newNode;
+    newNode->next=&store_sentinal;
+    return 0;
 }
 
 /**
@@ -84,8 +176,35 @@ int store_set_string(char *var, char *val) {
  * @param  val  The value to set.
  */
 int store_set_int(char *var, long val) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(store_sentinal.next==NULL || store_sentinal.prev==NULL) {
+        store_sentinal.next=&store_sentinal;
+        store_sentinal.prev=&store_sentinal;
+    }
+    struct d_storage *pointer = store_sentinal.next;
+    while(pointer!=&store_sentinal) {
+        if(strcmp(pointer->data->var, var)==0) {
+            free(pointer->data->val);
+            char *newVal = (char*) malloc(digit_len(val));
+            sprintf(newVal, "%ld", val);
+            pointer->data->val=newVal;
+            return 0;
+        }
+        pointer=pointer->next;
+    }
+    char *newVar = (char*) malloc(strlen(var));
+    strcpy(newVar, var);
+    char *newVal = (char*) malloc(digit_len(val));
+    sprintf(newVal, "%ld", val);
+    struct d_storage *newNode = malloc(sizeof(struct d_storage));
+    struct data *dataPointer = malloc(sizeof(struct data));
+    dataPointer->var=newVar;
+    dataPointer->val=newVal;
+    newNode->data=dataPointer;
+    store_sentinal.prev->next=newNode;
+    newNode->prev=store_sentinal.prev;
+    store_sentinal.prev=newNode;
+    newNode->next=&store_sentinal;
+    return 0;
 }
 
 /**
@@ -97,6 +216,14 @@ int store_set_int(char *var, long val) {
  * @param f  The stream to which the store contents are to be printed.
  */
 void store_show(FILE *f) {
-    // TO BE IMPLEMENTED
-    abort();
+    fprintf(f, "{");
+    struct d_storage *pointer = store_sentinal.next;
+    while(pointer!=&store_sentinal) {
+        if(pointer->next==&store_sentinal)
+            fprintf(f, "%s=%s", pointer->data->var, pointer->data->val);
+        else
+            fprintf(f, "%s=%s,", pointer->data->var, pointer->data->val);
+        pointer=pointer->next;
+    }
+    fprintf(f, "}");
 }
