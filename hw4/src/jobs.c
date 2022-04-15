@@ -9,8 +9,20 @@
 #include <errno.h>
 #include <sys/time.h>
 
-#include "mush.h"
+#include "program.h"
 #include "debug.h"
+static int currentJobID=0;
+static int currentJobIndex=0;
+static JOB jobsTable[MAX_JOBS];
+int numCommands(PIPELINE *pline) {
+    int n=0;
+    COMMAND *pointer=pline->commands;
+    while(pointer!=NULL) {
+        n++;
+        pointer=pointer->next;
+    }
+    return n;
+}
 
 /*
  * This is the "jobs" module for Mush.
@@ -121,8 +133,64 @@ int jobs_show(FILE *file) {
  * value returned is the job ID assigned to the pipeline.
  */
 int jobs_run(PIPELINE *pline) {
-    // TO BE IMPLEMENTED
-    abort();
+    if(currentJobIndex==MAX_JOBS-1)
+        return -1;
+    pid_t pid = fork();
+    if (pid<0)
+        return -1;
+    if (pid==0) {
+        int fd[2*(numCommands(pline)-1)];
+        for(int i=0; i<(numCommands(pline)-1); i++) {
+            if(pipe(fd+(2*i))<0) 
+                return 0;
+        }
+        COMMAND *pointer=pline->commands;
+        for(int i=0; i<numCommands(pline); i++) {
+            pid_t lPID  = fork();
+            if (lPID<0)
+                return -1;
+            if (lPID==0) {
+                if(i==0) {
+                    int ipd;
+                    if(pline->input_file!=NULL) {
+                        ipd=open(pline->input_file, O_RDONLY);
+                        dup2(ipd, STDIN_FILENO);
+                        close(ipd);
+                    }
+                }
+                else {
+                    dup2(fd[2*i],STDIN_FILENO);
+                }
+                if(pointer->next==NULL) {
+                    int opd;
+                    if(pline->output_file!=NULL) {
+                        opd=open(pline->output_file, O_WRONLY|O_CREAT);
+                        dup2(opd, STDOUT_FILENO);
+                        close(opd);
+                    }
+                }
+                else {
+                    dup2(fd[(2*i)+1], STDOUT_FILENO);
+                }
+                for (int j=0; j<(numCommands(pline)-1); j++) {
+                    close(fd[j*2]);
+                    close(fd[(j*2)+1]);
+                }
+                char *arg[] = {pointer->args->expr->members.variable, pointer->args->next->expr->members.variable, NULL};
+                execvp(arg[0], arg);
+            }
+            //fd[0] == read fd[1] == write
+            pointer=pointer->next;
+        }
+    }
+    else {
+        jobsTable[currentJobIndex].jobid=currentJobID;
+        currentJobID++;
+        jobsTable[currentJobIndex].pid=pid;
+        jobsTable[currentJobIndex].status=0;
+        jobsTable[currentJobIndex].pipeline=pline;
+    }
+    return currentJobID-1;
 }
 
 /**

@@ -29,16 +29,20 @@ static struct p_storage sentinal;
  * @return  0 if successful, -1 if any error occurred.
  */
 int prog_list(FILE *out) {
+    if(out==NULL)
+        return -1;
     struct p_storage *pointer = sentinal.next;
     if(sentinal.next==NULL || sentinal.next==&sentinal) {
         fprintf(out, "-->\n");
         return 0;
     }
     while(pointer!=&sentinal) {
+        if(counter==-1 && pointer->prev==&sentinal)
+            fprintf(out, "-->\n");
         if(pointer->statement->lineno==counter+1)
             fprintf(out, "-->\n");
         show_stmt(out, pointer->statement);
-        if(counter==-1 && pointer->next==&sentinal)
+        if(counter==-2 && pointer->next==&sentinal)
             fprintf(out, "-->\n");
         pointer=pointer->next;
     }
@@ -82,6 +86,8 @@ int prog_insert(STMT *stmt) {
             newNode->prev=pointer;
             sentinal.prev=newNode;
             pointer->next=newNode;
+            if(counter==-2)
+                counter=stmt->lineno-1;
             return 0;
         }
         if (stmt->lineno==pointer->statement->lineno) {
@@ -134,7 +140,7 @@ int prog_delete(int min, int max) {
         if(pointer->statement->lineno>=min && pointer->statement->lineno<=max) {
             if((pointer->statement->lineno)==counter+1) {
                 if(pointer->next==&sentinal)
-                    counter=-1;
+                    counter=-2;
                 else 
                     counter=pointer->next->statement->lineno-1;    
             }
@@ -210,7 +216,7 @@ STMT *prog_next() {
     while (pointer!=&sentinal) {
         if((pointer->statement->lineno)==counter+1) {
             if(pointer->next==&sentinal)  {
-                counter=-1;
+                counter=-2;
                 return NULL;
             }
             counter=(pointer->next->statement->lineno-1);

@@ -14,6 +14,8 @@ int digit_len(long num) {
     return i;
 }
 int is_num(char *str) {
+    if(*str=='-')
+        str++;
     while(*str!='\0') {
         if(*str<48 || *str>57) {
             return 0;
@@ -24,11 +26,18 @@ int is_num(char *str) {
 }
 long strToNum(char *str) {
     long i=0;
+    int neg=0;
+    if (*str=='-') {
+        str++;
+        neg=1;
+    }
     while(*str!='\0') {
         i=i*10;
         i=i+*str-48;
         str++;
     }
+    if (neg)
+        i=i*-1;
     return i;
 }
 /*
@@ -216,6 +225,10 @@ int store_set_int(char *var, long val) {
  * @param f  The stream to which the store contents are to be printed.
  */
 void store_show(FILE *f) {
+    if (store_sentinal.next==NULL || store_sentinal.prev==NULL) {
+        fprintf(f, "{}");
+        return;
+    }
     fprintf(f, "{");
     struct d_storage *pointer = store_sentinal.next;
     while(pointer!=&store_sentinal) {
