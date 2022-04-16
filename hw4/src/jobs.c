@@ -13,9 +13,6 @@
 #include "debug.h"
 static int currentJobID=0;
 static int currentJobIndex=0;
-// void sigchld_handler(int sig) {
-//     printf("heloooooooooooooooooooooooooooooooooooooooooooooooooooooo");
-// }
 static JOB jobsTable[MAX_JOBS];
 int numCommands(PIPELINE *pline) {
     int n=0;
@@ -206,23 +203,23 @@ int jobs_run(PIPELINE *pline) {
             //fd[0] == read fd[1] == write
             pointer=pointer->next;
         }
-        // int child_status;
-        // for(int i=numCommands(pline)-1; i>=0; i--) {
-        //     //pid_t wpid = 
-        //     waitpid(pid[i], &child_status, 0);
-        //     // if(WIFEXITED(child_status))
-        //     //     printf("child %d terminated with exist status %d\n", wpid, WEXITSTATUS(child_status));
-        // }
-        
+        int child_status;
+        for(int i=numCommands(pline)-1; i>=0; i--) {
+            waitpid(pid[i], &child_status, 0);
+        }
+        exit(EXIT_SUCCESS);
     }
     else {
         jobsTable[currentJobIndex].jobid=currentJobID;
         currentJobID++;
         jobsTable[currentJobIndex].pid=pid;
-        jobsTable[currentJobIndex].status=0;
+        jobsTable[currentJobIndex].status=1;
         jobsTable[currentJobIndex].pipeline=pline;
     }
-    jobsTable[currentJobIndex].status=1;
+    if(pid!=0) {
+        wait(NULL);
+        jobsTable[currentJobIndex].status=2;
+    }
     currentJobIndex++;
     return currentJobID-1;
 }
@@ -238,8 +235,6 @@ int jobs_run(PIPELINE *pline) {
  * or -1 if any error occurs that makes it impossible to wait for the specified job.
  */
 int jobs_wait(int jobid) {
-    abort();
-    // printf("JOBID: %d\n", jobid);
     // int child_status;
     // for(int i=0; i<MAX_JOBS; i++) {
     //     if(jobsTable[i].jobid==jobid) {
@@ -252,6 +247,7 @@ int jobs_wait(int jobid) {
     //     }
     // }
     // return WEXITSTATUS(child_status);
+    return 0;
 }
                 
 
