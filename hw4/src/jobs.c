@@ -13,6 +13,9 @@
 #include "debug.h"
 static int currentJobID=0;
 static int currentJobIndex=0;
+// void sigchld_handler(int sig) {
+//     printf("heloooooooooooooooooooooooooooooooooooooooooooooooooooooo");
+// }
 static JOB jobsTable[MAX_JOBS];
 int numCommands(PIPELINE *pline) {
     int n=0;
@@ -59,8 +62,10 @@ int numCommands(PIPELINE *pline) {
  * @return 0 if initialization is successful, otherwise -1.
  */
 int jobs_init(void) {
-    // TO BE IMPLEMENTED
-    abort();
+    //signal(SIGCHLD, sigchld_handler);
+    for(int i=0; i<MAX_JOBS; i++)
+        jobsTable[i].jobid=-1;
+    return 0;
 }
 
 /**
@@ -95,8 +100,25 @@ int jobs_fini(void) {
  * @return 0  If the jobs table was successfully printed, -1 otherwise.
  */
 int jobs_show(FILE *file) {
-    // TO BE IMPLEMENTED
-    abort();
+    for(int i=0; i<MAX_JOBS; i++) {
+        if(jobsTable[i].jobid!=-1) {
+            fprintf(file, "%d\t%d\t", jobsTable[i].jobid, jobsTable[i].pid);
+            if(jobsTable[i].status==0)
+                fprintf(file, "%s\t", NEW);
+            if(jobsTable[i].status==1)
+                fprintf(file, "%s\t", RUNNING);
+            if(jobsTable[i].status==2)
+                fprintf(file, "%s\t", CANCELED);
+            if(jobsTable[i].status==3)
+                fprintf(file, "%s\t", COMPLETED);
+            if(jobsTable[i].status==4)
+                fprintf(file, "%s\t", ABORTED);
+            fprintf(file, "t");
+            show_pipeline(file, jobsTable[i].pipeline);
+            fprintf(file, "\n");
+        }
+    }
+    return 0;
 }
 
 /**
@@ -139,17 +161,19 @@ int jobs_run(PIPELINE *pline) {
     if (pid<0)
         return -1;
     if (pid==0) {
+        setpgid(0,0);
         int fd[2*(numCommands(pline)-1)];
         for(int i=0; i<(numCommands(pline)-1); i++) {
             if(pipe(fd+(2*i))<0) 
                 return 0;
         }
         COMMAND *pointer=pline->commands;
+        pid_t pid[numCommands(pline)];
         for(int i=0; i<numCommands(pline); i++) {
-            pid_t lPID  = fork();
-            if (lPID<0)
+            pid[i] = fork();
+            if (pid[i]<0)
                 return -1;
-            if (lPID==0) {
+            if (pid[i]==0) {
                 if(i==0) {
                     int ipd;
                     if(pline->input_file!=NULL) {
@@ -159,7 +183,7 @@ int jobs_run(PIPELINE *pline) {
                     }
                 }
                 else {
-                    dup2(fd[2*i],STDIN_FILENO);
+                    dup2(fd[2*(i-1)],STDIN_FILENO);
                 }
                 if(pointer->next==NULL) {
                     int opd;
@@ -182,6 +206,14 @@ int jobs_run(PIPELINE *pline) {
             //fd[0] == read fd[1] == write
             pointer=pointer->next;
         }
+        // int child_status;
+        // for(int i=numCommands(pline)-1; i>=0; i--) {
+        //     //pid_t wpid = 
+        //     waitpid(pid[i], &child_status, 0);
+        //     // if(WIFEXITED(child_status))
+        //     //     printf("child %d terminated with exist status %d\n", wpid, WEXITSTATUS(child_status));
+        // }
+        
     }
     else {
         jobsTable[currentJobIndex].jobid=currentJobID;
@@ -190,6 +222,8 @@ int jobs_run(PIPELINE *pline) {
         jobsTable[currentJobIndex].status=0;
         jobsTable[currentJobIndex].pipeline=pline;
     }
+    jobsTable[currentJobIndex].status=1;
+    currentJobIndex++;
     return currentJobID-1;
 }
 
@@ -204,9 +238,22 @@ int jobs_run(PIPELINE *pline) {
  * or -1 if any error occurs that makes it impossible to wait for the specified job.
  */
 int jobs_wait(int jobid) {
-    // TO BE IMPLEMENTED
     abort();
+    // printf("JOBID: %d\n", jobid);
+    // int child_status;
+    // for(int i=0; i<MAX_JOBS; i++) {
+    //     if(jobsTable[i].jobid==jobid) {
+    //         if(jobsTable[i].status==2 || jobsTable[i].status==3 || jobsTable[i].status==4)
+    //             return -1;
+    //         pid_t wpid = waitpid(jobsTable[i].pid, &child_status, 1);
+    //         if(WIFEXITED(child_status))
+    //             printf("leader %d terminated with exist status %d\n", wpid, WEXITSTATUS(child_status));
+    //         jobsTable[i].status=3;
+    //     }
+    // }
+    // return WEXITSTATUS(child_status);
 }
+                
 
 /**
  * @brief  Poll to find out if a job has terminated.
@@ -236,8 +283,28 @@ int jobs_poll(int jobid) {
  * @return  0 if the job was successfully expunged, -1 if the job could not be expunged.
  */
 int jobs_expunge(int jobid) {
-    // TO BE IMPLEMENTED
-    abort();
+    for(int i=0; i<MAX_JOBS; i++) {
+        if(jobsTable[i].jobid==jobid) {
+            if(jobsTable[i].status==0 || jobsTable[i].status==1)
+                return -1;
+            for(int j=i; j<MAX_JOBS; j++) {
+                if(j==MAX_JOBS-1) {
+                    jobsTable[j].jobid=-1;
+                    jobsTable[j].pid=0;
+                    jobsTable[j].status=0;
+                    jobsTable[j].pipeline=NULL;
+                }
+                else {
+                    jobsTable[j].jobid=jobsTable[j+1].jobid;
+                    jobsTable[j].pid=jobsTable[j+1].pid;
+                    jobsTable[j].status=jobsTable[j+1].status;
+                    jobsTable[1].pipeline=jobsTable[j+1].pipeline;
+                }
+            }
+        }
+    }
+    currentJobIndex--;
+    return 0;
 }
 
 /**
