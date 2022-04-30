@@ -77,6 +77,7 @@ void *pbx_client_service(void *arg) {
             free(command);
             commandlen=0;
             pbx_unregister(pbx, tu);
+            close(connfd);
             return NULL;
         }
         if(strcmp(command, tu_command_names[TU_PICKUP_CMD])==0) {

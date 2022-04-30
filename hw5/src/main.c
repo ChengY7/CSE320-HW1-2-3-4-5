@@ -38,7 +38,7 @@ int main(int argc, char* argv[]){
     char *port;
     if(argc==1) {
         fprintf(stderr, "Usage: demo/pbx -p <port>\n");
-        exit(EXIT_FAILURE);
+        exit(EXIT_SUCCESS);
     }
     if(argc==2) {
         if(*argv[1]!='-' || *(argv[1]+1)!='p') {
