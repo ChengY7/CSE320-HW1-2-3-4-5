@@ -5,7 +5,14 @@
 
 #include "pbx.h"
 #include "debug.h"
-
+#include "csapp.h"
+typedef struct tu {
+    TU_STATE state;
+    int fd;
+    TU *connectedTU;
+    int refCount;
+    sem_t mutex;
+} TU;
 /*
  * Initialize a TU
  *
@@ -13,10 +20,19 @@
  * @return  The TU, newly initialized and in the TU_ON_HOOK state, if initialization
  * was successful, otherwise NULL.
  */
-#if 0
+#if 1
 TU *tu_init(int fd) {
-    // TO BE IMPLEMENTED
-    abort();
+    TU *newTU = malloc(sizeof(TU));
+    newTU->state=TU_ON_HOOK;
+    newTU->fd=fd;
+    newTU->connectedTU=NULL;
+    newTU->refCount=-1;
+    sem_init(&(newTU->mutex), 0, 1);
+    char buffer[11];
+    int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], fd);
+    write(fd, buffer, len);
+    write(fd, "\n", 1);
+    return newTU;
 }
 #endif
 
@@ -27,10 +43,14 @@ TU *tu_init(int fd) {
  * @param reason  A string describing the reason why the count is being incremented
  * (for debugging purposes).
  */
-#if 0
+#if 1
 void tu_ref(TU *tu, char *reason) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    if((tu->refCount)==-1)
+        tu->refCount=1;
+    else    
+        tu->refCount++;
+    V(&(tu->mutex));
 }
 #endif
 
@@ -41,10 +61,17 @@ void tu_ref(TU *tu, char *reason) {
  * @param reason  A string describing the reason why the count is being decremented
  * (for debugging purposes).
  */
-#if 0
+#if 1
 void tu_unref(TU *tu, char *reason) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    tu->refCount--;
+    if((tu->refCount)==0) {
+        V(&(tu->mutex));
+        sem_destroy(&(tu->mutex));
+        free(tu);
+        return;
+    }
+    V(&(tu->mutex));
 }
 #endif
 
@@ -57,10 +84,12 @@ void tu_unref(TU *tu, char *reason) {
  * @param tu
  * @return the underlying file descriptor, if any, otherwise -1.
  */
-#if 0
+#if 1
 int tu_fileno(TU *tu) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    int fd=tu->fd;
+    V(&(tu->mutex));
+    return fd;
 }
 #endif
 
@@ -74,10 +103,12 @@ int tu_fileno(TU *tu) {
  * @param tu
  * @return the extension number, if any, otherwise -1.
  */
-#if 0
+#if 1
 int tu_extension(TU *tu) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    int ext=tu->fd;
+    V(&(tu->mutex));
+    return ext;
 }
 #endif
 
@@ -88,10 +119,12 @@ int tu_extension(TU *tu) {
  *
  * @param tu  The TU whose extension is being set.
  */
-#if 0
+#if 1
 int tu_set_extension(TU *tu, int ext) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    tu->fd=ext;
+    V(&(tu->mutex));
+    return 0;
 }
 #endif
 
@@ -125,10 +158,107 @@ int tu_set_extension(TU *tu, int ext) {
  * @return 0 if successful, -1 if any error occurs that results in the originating
  * TU transitioning to the TU_ERROR state. 
  */
-#if 0
+#if 1
 int tu_dial(TU *tu, TU *target) {
-    // TO BE IMPLEMENTED
-    abort();
+    //if tu is not in dial tone
+    P(&(tu->mutex));
+    if(tu->state!=TU_DIAL_TONE) {
+        if(tu->state==TU_ON_HOOK) {
+            char buffer[11];
+            int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], tu->fd);
+            write(tu->fd, buffer, len);
+            write(tu->fd, "\n", 1);
+            V(&(tu->mutex));
+            return 0;
+        }
+        if(tu->state==TU_RINGING) {
+            write(tu->fd, tu_state_names[TU_RINGING], 7);
+            write(tu->fd, "\n", 1);
+            V(&(tu->mutex));
+            return 0;
+        }
+        if(tu->state==TU_RING_BACK) {
+            write(tu->fd, tu_state_names[TU_RING_BACK], 9);
+            write(tu->fd, "\n", 1);
+            V(&(tu->mutex));
+            return 0;
+        }
+        if(tu->state==TU_BUSY_SIGNAL) {
+            write(tu->fd, tu_state_names[TU_BUSY_SIGNAL], 11);
+            write(tu->fd, "\n", 1);
+            V(&(tu->mutex));
+            return 0;
+        }
+        if(tu->state==TU_CONNECTED) {
+            char buffer[14];
+            int len = sprintf(buffer, "%s %d", tu_state_names[TU_CONNECTED], tu->connectedTU->fd);
+            write(tu->fd, buffer, len);
+            write(tu->fd, "\n", 1);
+            V(&(tu->mutex));
+            return 0;
+        }
+        if(tu->state==TU_ERROR) {
+            write(tu->fd, tu_state_names[TU_ERROR], 5);
+            write(tu->fd, "\n", 1);
+            V(&(tu->mutex));
+            return 0;
+        }
+        else {
+            V(&(tu->mutex));
+            return 0;
+        }
+    }
+    V(&(tu->mutex));
+    //if tu is the same as target
+    if(tu==target) {
+        P(&(tu->mutex));
+        tu->state=TU_BUSY_SIGNAL;
+        write(tu->fd, tu_state_names[TU_BUSY_SIGNAL], 11);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return 0;
+    }
+    if(target==NULL) {
+        P(&(tu->mutex));
+        tu->state=TU_ERROR;
+        write(tu->fd, tu_state_names[TU_ERROR], 5);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return -1;
+    }
+    //if target has a peer or target not in TU_ON_HOOK
+    P(&(target->mutex));
+    if(target->connectedTU!=NULL || target->state!=TU_ON_HOOK) {
+        V(&(target->mutex));
+        P(&(tu->mutex));
+        tu->state=TU_BUSY_SIGNAL;
+        write(tu->fd, tu_state_names[TU_BUSY_SIGNAL], 11);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return 0;
+    }
+    V(&(target->mutex));
+    //if able to connect
+    if(tu<target) {
+        P(&(tu->mutex));
+        P(&(target->mutex));
+    } else {
+        P(&(target->mutex));
+        P(&(tu->mutex));
+    }
+    tu->connectedTU=target;
+    target->connectedTU=tu;
+    tu->refCount++;
+    target->refCount++;
+    tu->state=TU_RING_BACK;
+    target->state=TU_RINGING;
+    write(tu->fd, tu_state_names[TU_RING_BACK], 9);
+    write(tu->fd, "\n", 1);
+    write(target->fd, tu_state_names[TU_RINGING], 7);
+    write(target->fd, "\n", 1);
+    V(&(tu->mutex));
+    V(&(tu->connectedTU->mutex));
+    return 0;
 }
 #endif
 
@@ -149,10 +279,72 @@ int tu_dial(TU *tu, TU *target) {
  * @return 0 if successful, -1 if any error occurs that results in the originating
  * TU transitioning to the TU_ERROR state. 
  */
-#if 0
+#if 1
 int tu_pickup(TU *tu) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    if(tu->state==TU_ON_HOOK) {
+        tu->state=TU_DIAL_TONE;
+        write(tu->fd, tu_state_names[TU_DIAL_TONE], 9);
+        write(tu->fd, "\n", 1);
+        V(&tu->mutex);
+        return 0;
+    }
+    if(tu->state==TU_RINGING) {
+        V(&(tu->mutex));
+        if(tu<tu->connectedTU) {
+            P(&(tu->mutex));
+            P(&(tu->connectedTU->mutex));
+        } else {
+            P(&(tu->connectedTU->mutex));
+            P(&(tu->mutex));
+        }
+        tu->state=TU_CONNECTED;
+        tu->connectedTU->state=TU_CONNECTED;
+        char buffer[14];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_CONNECTED], tu->connectedTU->fd);
+        write(tu->fd, buffer, len);
+        write(tu->fd, "\n", 1);
+        len = sprintf(buffer, "%s %d", tu_state_names[TU_CONNECTED], tu->fd);
+        write(tu->connectedTU->fd, buffer, len);
+        write(tu->connectedTU->fd, "\n", 1);
+        V(&(tu->mutex));
+        V(&(tu->connectedTU->mutex));
+        return 0;
+    }
+    if(tu->state==TU_DIAL_TONE) {
+        write(tu->fd, tu_state_names[TU_DIAL_TONE], 9);
+        write(tu->fd, "\n", 1);
+        V(&tu->mutex);
+        return 0;
+    }
+    if(tu->state==TU_RING_BACK) {
+        write(tu->fd, tu_state_names[TU_RING_BACK], 9);
+        write(tu->fd, "\n", 1);
+        V(&tu->mutex);
+        return 0;
+    }
+    if(tu->state==TU_BUSY_SIGNAL) {
+        write(tu->fd, tu_state_names[TU_BUSY_SIGNAL], 11);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return 0;
+    }
+    if(tu->state==TU_CONNECTED) {
+        char buffer[14];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_CONNECTED], tu->connectedTU->fd);
+        write(tu->fd, buffer, len);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return 0;
+    }
+    if(tu->state==TU_ERROR) {
+        write(tu->fd, tu_state_names[TU_ERROR], 5);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return 0;
+    }
+    V(&(tu->mutex));
+    return -1;
 }
 #endif
 
@@ -177,10 +369,89 @@ int tu_pickup(TU *tu) {
  * @return 0 if successful, -1 if any error occurs that results in the originating
  * TU transitioning to the TU_ERROR state. 
  */
-#if 0
+#if 1
 int tu_hangup(TU *tu) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    if(tu->state==TU_CONNECTED || tu->state==TU_RINGING) {
+        V(&(tu->mutex));
+        if(tu<tu->connectedTU) {
+            P(&(tu->mutex));
+            P(&(tu->connectedTU->mutex));
+        } else {
+            P(&(tu->connectedTU->mutex));
+            P(&(tu->mutex));
+        }
+        tu->state=TU_ON_HOOK;
+        tu->connectedTU->state=TU_DIAL_TONE;
+        char buffer[11];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], tu->fd);
+        if(tu->fd!=-1) {
+            write(tu->fd, buffer, len);
+            write(tu->fd, "\n", 1);
+        }
+        write(tu->connectedTU->fd, tu_state_names[TU_DIAL_TONE], 9);
+        write(tu->connectedTU->fd, "\n", 1);
+        TU* peer= tu->connectedTU;
+        tu->refCount--;
+        peer->refCount--;
+        peer->connectedTU=NULL;
+        tu->connectedTU=NULL;
+        V(&(tu->mutex));
+        V(&(peer->mutex));
+        return 0;
+    }
+    if(tu->state==TU_RING_BACK) {
+        V(&(tu->mutex));
+        if(tu<tu->connectedTU) {
+            P(&(tu->mutex));
+            P(&(tu->connectedTU->mutex));
+        } else {
+            P(&(tu->connectedTU->mutex));
+            P(&(tu->mutex));
+        }
+        tu->state=TU_ON_HOOK;
+        tu->connectedTU->state=TU_ON_HOOK;
+        char buffer[11];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], tu->fd);
+        if(tu->fd!=-1) {
+            write(tu->fd, buffer, len);
+            write(tu->fd, "\n", 1);
+        }
+        len = sprintf(buffer,  "%s %d", tu_state_names[TU_ON_HOOK], tu->connectedTU->fd);
+        write(tu->connectedTU->fd, buffer, len);
+        write(tu->connectedTU->fd, "\n", 1);
+        TU* peer= tu->connectedTU;
+        tu->refCount--;
+        peer->refCount--;
+        peer->connectedTU=NULL;
+        tu->connectedTU=NULL;
+        V(&(tu->mutex));
+        V(&(peer->mutex));
+        return 0;
+    }
+    if(tu->state==TU_DIAL_TONE || tu->state==TU_BUSY_SIGNAL || tu->state==TU_ERROR) {
+        tu->state=TU_ON_HOOK;
+        char buffer[11];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], tu->fd);
+        if(tu->fd!=-1) {
+            write(tu->fd, buffer, len);
+            write(tu->fd, "\n", 1);
+        }
+        V(&(tu->mutex));
+        return 0;
+    }
+    if(tu->state==TU_ON_HOOK) {
+        char buffer[11];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], tu->fd);
+        if(tu->fd!=-1) {
+            write(tu->fd, buffer, len);
+            write(tu->fd, "\n", 1);
+        }
+        V(&(tu->mutex));
+        return 0;
+    }
+    V(&(tu->mutex));
+    return -1;
 }
 #endif
 
@@ -197,9 +468,67 @@ int tu_hangup(TU *tu) {
  * @return 0  If the chat was successfully sent, -1 if there is no call in progress
  * or some other error occurs.
  */
-#if 0
+#if 1
 int tu_chat(TU *tu, char *msg) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&(tu->mutex));
+    if(tu->state==TU_ON_HOOK) {
+        char buffer[11];
+        int len = sprintf(buffer, "%s %d", tu_state_names[TU_ON_HOOK], tu->fd);
+        write(tu->fd, buffer, len);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return -1;
+    }
+    if(tu->state==TU_RINGING) {
+        write(tu->fd, tu_state_names[TU_RINGING], 7);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return -1;
+    }
+    if(tu->state==TU_DIAL_TONE) {
+        write(tu->fd, tu_state_names[TU_DIAL_TONE], 9);
+        write(tu->fd, "\n", 1);
+        V(&tu->mutex);
+        return -1;
+    }
+    if(tu->state==TU_RING_BACK) {
+        write(tu->fd, tu_state_names[TU_RING_BACK], 9);
+        write(tu->fd, "\n", 1);
+        V(&tu->mutex);
+        return -1;
+    }
+    if(tu->state==TU_BUSY_SIGNAL) {
+        write(tu->fd, tu_state_names[TU_BUSY_SIGNAL], 11);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return -1;
+    }
+    if(tu->state==TU_ERROR) {
+        write(tu->fd, tu_state_names[TU_ERROR], 5);
+        write(tu->fd, "\n", 1);
+        V(&(tu->mutex));
+        return -1;
+    }
+    if(tu->state==TU_CONNECTED) {
+        V(&(tu->mutex));
+        if(tu<tu->connectedTU) {
+            P(&(tu->mutex));
+            P(&(tu->connectedTU->mutex));
+        } else {
+            P(&(tu->connectedTU->mutex));
+            P(&(tu->mutex));
+        }
+        write(tu->connectedTU->fd, "CHAT ", 5);
+        while(*msg==' ') {
+            msg++;
+        }
+        write(tu->connectedTU->fd, msg, strlen(msg));
+        write(tu->connectedTU->fd, "\n", 1);
+        V(&(tu->mutex));
+        V(&(tu->connectedTU->mutex));
+        return 0;
+    }
+    V(&(tu->mutex));
+    return -1;
 }
 #endif

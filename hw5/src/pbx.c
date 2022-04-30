@@ -2,19 +2,25 @@
  * PBX: simulates a Private Branch Exchange.
  */
 #include <stdlib.h>
-
 #include "pbx.h"
 #include "debug.h"
+#include "csapp.h"
 
 /*
  * Initialize a new PBX.
  *
  * @return the newly initialized PBX, or NULL if initialization fails.
  */
-#if 0
+sem_t mutex;
+typedef struct pbx {
+    TU *tuArray[PBX_MAX_EXTENSIONS];
+} PBX;
+
+#if 1
 PBX *pbx_init() {
-    // TO BE IMPLEMENTED
-    abort();
+    pbx=malloc(sizeof(PBX));
+    sem_init(&mutex, 0, 1);
+    return pbx;
 }
 #endif
 
@@ -28,10 +34,16 @@ PBX *pbx_init() {
  *
  * @param pbx  The PBX to be shut down.
  */
-#if 0
+#if 1
 void pbx_shutdown(PBX *pbx) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&mutex);
+    for(int i=0; i<PBX_MAX_EXTENSIONS; i++) {
+        if(pbx->tuArray[i]!=NULL)
+            free(pbx->tuArray[i]);
+    }
+    free(pbx);
+    V(&mutex);
+    sem_destroy(&mutex);
 }
 #endif
 
@@ -49,10 +61,19 @@ void pbx_shutdown(PBX *pbx) {
  * @param ext  The extension number on which the TU is to be registered.
  * @return 0 if registration succeeds, otherwise -1.
  */
-#if 0
+#if 1
 int pbx_register(PBX *pbx, TU *tu, int ext) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&mutex);
+    if(pbx->tuArray[ext]!=NULL) {
+        V(&mutex);
+        return -1;
+    }
+    //tu->state=TU_ON_HOOK;
+    tu_set_extension(tu, ext);
+    pbx->tuArray[ext]=tu;
+    tu_ref(tu, NULL);
+    V(&mutex);
+    return 0;
 }
 #endif
 
@@ -68,10 +89,15 @@ int pbx_register(PBX *pbx, TU *tu, int ext) {
  * @param tu  The TU to be unregistered.
  * @return 0 if unregistration succeeds, otherwise -1.
  */
-#if 0
+#if 1
 int pbx_unregister(PBX *pbx, TU *tu) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&mutex);
+    tu_set_extension(tu, -1);
+    tu_hangup(tu);
+    tu_unref(tu, NULL);
+    pbx->tuArray[tu_extension(tu)]=NULL;
+    V(&mutex);
+    return 0;
 }
 #endif
 
@@ -83,9 +109,11 @@ int pbx_unregister(PBX *pbx, TU *tu) {
  * @param ext  The extension number to be called.
  * @return 0 if dialing succeeds, otherwise -1.
  */
-#if 0
+#if 1
 int pbx_dial(PBX *pbx, TU *tu, int ext) {
-    // TO BE IMPLEMENTED
-    abort();
+    P(&mutex);
+    tu_dial(tu, pbx->tuArray[ext]);
+    V(&mutex);
+    return 0;
 }
 #endif

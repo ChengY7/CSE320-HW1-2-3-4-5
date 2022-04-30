@@ -2,7 +2,9 @@
 #include <unistd.h>
 #include <signal.h>
 
+
 #include "pbx.h"
+#include "tu.h"
 #include "server.h"
 #include "debug.h"
 
@@ -11,8 +13,16 @@
 
 static void terminate(int status);
 void sighup_handler(int signal) {
-    printf("123");
     terminate(EXIT_SUCCESS);
+}
+int isNumber(char *str) {
+    while(*str!='\0') {
+        if(*str<48 || *str>57) {
+            return 0;
+        }
+        str++;
+    }
+    return 1;
 }
 
 /*
@@ -21,21 +31,45 @@ void sighup_handler(int signal) {
  * Usage: pbx <port>
  */
 int main(int argc, char* argv[]){
-    printf("%d\n", PBX_MAX_EXTENSIONS);
     // Option processing should be performed here.
     // Option '-p <port>' is required in order to specify the port number
     // on which the server should listen.
     int option;
     char *port;
+    if(argc==1) {
+        fprintf(stderr, "Usage: demo/pbx -p <port>\n");
+        exit(EXIT_FAILURE);
+    }
+    if(argc==2) {
+        if(*argv[1]!='-' || *(argv[1]+1)!='p') {
+            fprintf(stderr, "Usage: demo/pbx -p <port>\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    int optionflag=1;
     while ((option=getopt(argc, argv, "p:"))!=-1) {
         switch(option) {
             case 'p':
                 port=optarg;
+                optionflag=1;
                 break;
             default:
-                printf("testing");
+                optionflag=0;
                 break;
         }
+    }
+    if(optionflag==0) {
+        fprintf(stderr, "Usage: demo/pbx -p <port>\n");
+        exit(EXIT_FAILURE);
+    }
+    if(isNumber(port)==0) {
+        fprintf(stderr, "Usage: demo/pbx -p <port>\n");
+        exit(EXIT_FAILURE);
+    }
+    int num = atoi(port);
+    if(num<1024) {
+        fprintf(stderr, "bind: Permission denied\n");
+        exit(EXIT_FAILURE);
     }
     // Perform required initialization of the PBX module.
     debug("Initializing PBX...");
@@ -48,6 +82,8 @@ int main(int argc, char* argv[]){
     // shutdown of the server.
 
     struct sigaction action;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags=0;
     action.sa_handler=sighup_handler;
     sigaction(SIGHUP, &action, NULL);
 

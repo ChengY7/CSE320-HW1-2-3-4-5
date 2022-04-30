@@ -22,12 +22,12 @@ void *pbx_client_service(void *arg) {
     TU *tu = tu_init(connfd);
     if(pbx_register(pbx, tu, connfd)==-1) {
         return NULL;
-        //error to fix ^
     }
     int fd = tu_fileno(tu);
-    if(fd==-1)
+    if(fd==-1) {
+        pbx_unregister(pbx, tu);
         return NULL;
-        //error to fix ^
+    }
     char buffer;
     int readResult;
     char *command;
@@ -73,6 +73,12 @@ void *pbx_client_service(void *arg) {
                commandlen++;
             }
         }
+        if(readResult==0) {
+            free(command);
+            commandlen=0;
+            pbx_unregister(pbx, tu);
+            return NULL;
+        }
         if(strcmp(command, tu_command_names[TU_PICKUP_CMD])==0) {
             tu_pickup(tu);
         }
@@ -86,6 +92,9 @@ void *pbx_client_service(void *arg) {
             }
         }
         else if (strncmp(command, tu_command_names[TU_CHAT_CMD], 4)==0) {
+            command = realloc(command, commandlen+1);
+            command[commandlen]='\0'; 
+            commandlen++;
             tu_chat(tu, command+4);
         }
         free(command);
@@ -95,8 +104,8 @@ void *pbx_client_service(void *arg) {
     int unreg = pbx_unregister(pbx, tu);
     if(unreg==-1)
         return NULL;
-        //fix ^^
-    close(fd);    
+    close(connfd);
+    return NULL;    
 }
 #endif
 
