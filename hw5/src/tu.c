@@ -20,7 +20,7 @@ typedef struct tu {
  * @return  The TU, newly initialized and in the TU_ON_HOOK state, if initialization
  * was successful, otherwise NULL.
  */
-#if 1
+#if 0
 TU *tu_init(int fd) {
     TU *newTU = malloc(sizeof(TU));
     newTU->state=TU_ON_HOOK;
@@ -43,7 +43,7 @@ TU *tu_init(int fd) {
  * @param reason  A string describing the reason why the count is being incremented
  * (for debugging purposes).
  */
-#if 1
+#if 0
 void tu_ref(TU *tu, char *reason) {
     P(&(tu->mutex));
     if((tu->refCount)==-1)
@@ -61,7 +61,7 @@ void tu_ref(TU *tu, char *reason) {
  * @param reason  A string describing the reason why the count is being decremented
  * (for debugging purposes).
  */
-#if 1
+#if 0
 void tu_unref(TU *tu, char *reason) {
     P(&(tu->mutex));
     tu->refCount--;
@@ -84,7 +84,7 @@ void tu_unref(TU *tu, char *reason) {
  * @param tu
  * @return the underlying file descriptor, if any, otherwise -1.
  */
-#if 1
+#if 0
 int tu_fileno(TU *tu) {
     P(&(tu->mutex));
     int fd=tu->fd;
@@ -103,7 +103,7 @@ int tu_fileno(TU *tu) {
  * @param tu
  * @return the extension number, if any, otherwise -1.
  */
-#if 1
+#if 0
 int tu_extension(TU *tu) {
     P(&(tu->mutex));
     int ext=tu->fd;
@@ -119,7 +119,7 @@ int tu_extension(TU *tu) {
  *
  * @param tu  The TU whose extension is being set.
  */
-#if 1
+#if 0
 int tu_set_extension(TU *tu, int ext) {
     P(&(tu->mutex));
     tu->fd=ext;
@@ -158,7 +158,7 @@ int tu_set_extension(TU *tu, int ext) {
  * @return 0 if successful, -1 if any error occurs that results in the originating
  * TU transitioning to the TU_ERROR state. 
  */
-#if 1
+#if 0
 int tu_dial(TU *tu, TU *target) {
     //if tu is not in dial tone
     P(&(tu->mutex));
@@ -279,7 +279,7 @@ int tu_dial(TU *tu, TU *target) {
  * @return 0 if successful, -1 if any error occurs that results in the originating
  * TU transitioning to the TU_ERROR state. 
  */
-#if 1
+#if 0
 int tu_pickup(TU *tu) {
     P(&(tu->mutex));
     if(tu->state==TU_ON_HOOK) {
@@ -369,7 +369,7 @@ int tu_pickup(TU *tu) {
  * @return 0 if successful, -1 if any error occurs that results in the originating
  * TU transitioning to the TU_ERROR state. 
  */
-#if 1
+#if 0
 int tu_hangup(TU *tu) {
     P(&(tu->mutex));
     if(tu->state==TU_CONNECTED || tu->state==TU_RINGING) {
@@ -468,7 +468,7 @@ int tu_hangup(TU *tu) {
  * @return 0  If the chat was successfully sent, -1 if there is no call in progress
  * or some other error occurs.
  */
-#if 1
+#if 0
 int tu_chat(TU *tu, char *msg) {
     P(&(tu->mutex));
     if(tu->state==TU_ON_HOOK) {
