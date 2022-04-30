@@ -95,7 +95,7 @@ int pbx_register(PBX *pbx, TU *tu, int ext) {
 #if 1
 int pbx_unregister(PBX *pbx, TU *tu) {
     P(&mutex);
-    //tu_set_extension(tu, -1);
+    tu_set_extension(tu, -1);
     tu_hangup(tu);
     tu_unref(tu, NULL);
     pbx->tuArray[tu_extension(tu)]=NULL;
