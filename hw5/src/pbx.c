@@ -16,7 +16,7 @@ typedef struct pbx {
     TU *tuArray[PBX_MAX_EXTENSIONS];
 } PBX;
 
-#if 0
+#if 1
 PBX *pbx_init() {
     pbx=malloc(sizeof(PBX));
     sem_init(&mutex, 0, 1);
@@ -34,12 +34,16 @@ PBX *pbx_init() {
  *
  * @param pbx  The PBX to be shut down.
  */
-#if 0
+#if 1
 void pbx_shutdown(PBX *pbx) {
     P(&mutex);
     for(int i=0; i<PBX_MAX_EXTENSIONS; i++) {
-        if(pbx->tuArray[i]!=NULL)
-            free(pbx->tuArray[i]);
+        if(pbx->tuArray[i]!=NULL) {
+            shutdown(tu_fileno(pbx->tuArray[i]), SHUT_RDWR);
+            V(&mutex);
+            pbx_unregister(pbx, pbx->tuArray[i]);
+            P(&mutex);
+        }
     }
     free(pbx);
     V(&mutex);
@@ -61,14 +65,13 @@ void pbx_shutdown(PBX *pbx) {
  * @param ext  The extension number on which the TU is to be registered.
  * @return 0 if registration succeeds, otherwise -1.
  */
-#if 0
+#if 1
 int pbx_register(PBX *pbx, TU *tu, int ext) {
     P(&mutex);
     if(pbx->tuArray[ext]!=NULL) {
         V(&mutex);
         return -1;
     }
-    //tu->state=TU_ON_HOOK;
     tu_set_extension(tu, ext);
     pbx->tuArray[ext]=tu;
     tu_ref(tu, NULL);
@@ -89,10 +92,10 @@ int pbx_register(PBX *pbx, TU *tu, int ext) {
  * @param tu  The TU to be unregistered.
  * @return 0 if unregistration succeeds, otherwise -1.
  */
-#if 0
+#if 1
 int pbx_unregister(PBX *pbx, TU *tu) {
     P(&mutex);
-    tu_set_extension(tu, -1);
+    //tu_set_extension(tu, -1);
     tu_hangup(tu);
     tu_unref(tu, NULL);
     pbx->tuArray[tu_extension(tu)]=NULL;
@@ -109,7 +112,7 @@ int pbx_unregister(PBX *pbx, TU *tu) {
  * @param ext  The extension number to be called.
  * @return 0 if dialing succeeds, otherwise -1.
  */
-#if 0
+#if 1
 int pbx_dial(PBX *pbx, TU *tu, int ext) {
     P(&mutex);
     tu_dial(tu, pbx->tuArray[ext]);
