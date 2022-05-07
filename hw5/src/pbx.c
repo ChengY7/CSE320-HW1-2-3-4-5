@@ -12,14 +12,18 @@
  * @return the newly initialized PBX, or NULL if initialization fails.
  */
 sem_t mutex;
+sem_t shutdown_mutex;
 typedef struct pbx {
     TU *tuArray[PBX_MAX_EXTENSIONS];
+    int count;
 } PBX;
 
 #if 1
 PBX *pbx_init() {
-    pbx=malloc(sizeof(PBX));
+    PBX *pbx=malloc(sizeof(PBX));
+    pbx->count=0;
     sem_init(&mutex, 0, 1);
+    sem_init(&shutdown_mutex, 0, 1);
     return pbx;
 }
 #endif
@@ -39,14 +43,14 @@ void pbx_shutdown(PBX *pbx) {
     P(&mutex);
     for(int i=0; i<PBX_MAX_EXTENSIONS; i++) {
         if(pbx->tuArray[i]!=NULL) {
-            shutdown(tu_fileno(pbx->tuArray[i]), SHUT_RDWR);
-            V(&mutex);
-            pbx_unregister(pbx, pbx->tuArray[i]);
-            P(&mutex);
+            shutdown(tu_fileno(pbx->tuArray[i]), SHUT_RD);
         }
     }
-    free(pbx);
     V(&mutex);
+    P(&shutdown_mutex);
+    free(pbx);
+    V(&shutdown_mutex);
+    sem_destroy(&shutdown_mutex);
     sem_destroy(&mutex);
 }
 #endif
@@ -76,6 +80,9 @@ int pbx_register(PBX *pbx, TU *tu, int ext) {
     pbx->tuArray[ext]=tu;
     tu_ref(tu, NULL);
     dprintf(ext, "%s %d\n", tu_state_names[TU_ON_HOOK], ext);
+    pbx->count++;
+    if(pbx->count==1) 
+        P(&shutdown_mutex);
     V(&mutex);
     return 0;
 }
@@ -99,6 +106,10 @@ int pbx_unregister(PBX *pbx, TU *tu) {
     tu_hangup(tu);
     pbx->tuArray[tu_extension(tu)]=NULL;
     tu_unref(tu, NULL);
+    pbx->count--;
+    if(pbx->count==0) {
+        V(&shutdown_mutex);
+    }
     V(&mutex);
     return 0;
 }

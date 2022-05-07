@@ -87,17 +87,19 @@ int main(int argc, char* argv[]){
     action.sa_handler=sighup_handler;
     sigaction(SIGHUP, &action, NULL);
 
-    int listenfd, *connfd;
+    int listenfd;
     listenfd=open_listenfd(port);
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
     pthread_t tid;
 
+    int connfd;
     while(1) {
-        connfd = malloc(sizeof(int));
         clientlen = sizeof(struct sockaddr_storage);
-        *connfd=Accept(listenfd, (SA*) &clientaddr, &clientlen);
-        pthread_create(&tid, NULL, pbx_client_service, connfd);
+        connfd=Accept(listenfd, (SA*) &clientaddr, &clientlen);
+        int *connfdp=malloc(sizeof(int));
+        *connfdp=connfd;
+        pthread_create(&tid, NULL, pbx_client_service, connfdp);
     }
     fprintf(stderr, "You have to finish implementing main() "
 	    "before the PBX server will function.\n");
