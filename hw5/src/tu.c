@@ -28,7 +28,6 @@ TU *tu_init(int fd) {
     newTU->connectedTU=NULL;
     newTU->refCount=-1;
     sem_init(&(newTU->mutex), 0, 1);
-    dprintf(fd, "%s %d\n", tu_state_names[TU_ON_HOOK], fd);
     return newTU;
 }
 #endif

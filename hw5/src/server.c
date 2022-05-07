@@ -87,9 +87,23 @@ void *pbx_client_service(void *arg) {
             tu_hangup(tu);
         }
         else if(strncmp(command, tu_command_names[TU_DIAL_CMD], 4)==0) {
-            int num = atoi(command+4);
-            if(num>-1 && num<1024) {
-                pbx_dial(pbx, tu, num);
+            command = realloc(command, commandlen+1);
+            command[commandlen]='\0'; 
+            commandlen++;
+            char *temp=command+4;
+            int flag=0;
+            while(*temp!='\0') {
+                if(*temp!=' ') {
+                    flag=1;
+                    break;
+                }
+                temp++;
+            }
+            if(flag==1 && *(command+4)==' ') {
+                int num = atoi(command+4);
+                if(num>-1 && num<1024) {
+                    pbx_dial(pbx, tu, num);
+                }
             }
         }
         else if (strncmp(command, tu_command_names[TU_CHAT_CMD], 4)==0) {

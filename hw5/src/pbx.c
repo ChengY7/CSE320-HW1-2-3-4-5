@@ -75,6 +75,7 @@ int pbx_register(PBX *pbx, TU *tu, int ext) {
     tu_set_extension(tu, ext);
     pbx->tuArray[ext]=tu;
     tu_ref(tu, NULL);
+    dprintf(ext, "%s %d\n", tu_state_names[TU_ON_HOOK], ext);
     V(&mutex);
     return 0;
 }
